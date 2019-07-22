@@ -4,6 +4,8 @@
 #include <random>
 #include <string_view>
 
+#include <cpg/cpg.hpp>
+
 #include <fmt/format.h>
 
 #include <robin_hood/robin_hood.h>
@@ -20,7 +22,6 @@ namespace {
 std::mt19937 rand_gen;
 std::uniform_real_distribution<> udistrib(0, 1);
 }  // namespace
-
 
 std::string_view get_umi(const char* c, uint8_t len) {
   auto res = std::string_view(c, len);
@@ -154,8 +155,8 @@ void update_read_map(
 }
 
 template <class Fun>
-void process_bam_read_chunks(samFile* file,
-                             bam_hdr_t* bam_hdr, umi_opts opts, Fun fun) {
+void process_bam_read_chunks(samFile* file, bam_hdr_t* bam_hdr, umi_opts opts,
+                             Fun fun) {
   auto cur_ref = 0;
   auto last_ref = -1;
   auto last_pos = 0ul;
@@ -203,6 +204,13 @@ void process_bam_read_chunks(samFile* file,
     }
   };
 
+  cpg::cpg_cfg prog_cfg{};
+  prog_cfg.unit = "aln";
+  prog_cfg.unit_scale = true;
+  prog_cfg.mininterval = 3;
+
+  auto progress = cpg::cpg(prog_cfg);
+
   bam1_t* record = bam_init1();
   while (sam_read1(file, bam_hdr, record) > 0) {
     if ((record->core.flag & BAM_FUNMAP) == 0) {
@@ -219,16 +227,13 @@ void process_bam_read_chunks(samFile* file,
 
       last_pos = std::max(pos, start);
       last_ref = cur_ref;
-      auto key =
-          read_group{bam_is_rev(record),
-                     opts.spliced && is_spliced != 0,
-                     static_cast<uint16_t>(
-                         opts.read_length
-                             ? record->core.l_qseq
-                             : 0)};
+      auto key = read_group{
+          bam_is_rev(record), opts.spliced && is_spliced != 0,
+          static_cast<uint16_t>(opts.read_length ? record->core.l_qseq : 0)};
       update_read_map(record, pos, key, std::string{umi}, read_map,
                       read_counts);
     }
+    progress.update();
   }
   output_positions(std::nullopt);
   bam_destroy1(record);
@@ -238,6 +243,7 @@ void dedup(const std::string& input, const std::string& output, umi_opts opts) {
   rand_gen.seed(opts.seed);
 
   samFile* file = hts_open(input.c_str(), "r");
+
   if (file == nullptr) {
     throw std::runtime_error(fmt::format("Could not open file '{}'", input));
   }

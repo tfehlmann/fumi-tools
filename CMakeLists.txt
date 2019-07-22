@@ -72,6 +72,7 @@ include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/lib/cxxopts-include")
 include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/lib/robin-hood-hashing-include")
 include_directories(SYSTEM ${cppformat_INCLUDE_DIR})
 include_directories(SYSTEM ${htslib_INCLUDE_DIR})
+include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/lib/cpg/include")
 #include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/lib/array-hash")
 #include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/lib/cityhash")
 
