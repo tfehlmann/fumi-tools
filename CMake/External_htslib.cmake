@@ -20,7 +20,7 @@ ExternalProject_Add(
   SOURCE_DIR ${src}
   INSTALL_DIR ${install}
   BUILD_IN_SOURCE 1
-  CONFIGURE_COMMAND cd ${src} && bash -c "CFLAGS='-fPIC -I${Zlib_cf_INCLUDE} ${HTSLIB_C_FLAGS}' LDFLAGS='-fPIC -L${ZLib_cf_LIBRARY_DIR}' ./configure --prefix=${install} --without-curses --disable-bz2"
+  CONFIGURE_COMMAND cd ${src} && bash -c "CFLAGS='-fPIC -I${Zlib_cf_INCLUDE} ${HTSLIB_C_FLAGS}' LDFLAGS='-fPIC -L${ZLib_cf_LIBRARY_DIR}' ./configure --prefix=${install} --without-curses --disable-bz2 --disable-lzma"
 #  BUILD_COMMAND cd ${src} && sed -i "s#^CFLAGS.*$#CFLAGS = -fPIC -I${Zlib_cf_INCLUDE} ${HTSLIB_C_FLAGS}#" Makefile && sed -i "s#^LDFLAGS.*$#LDFLAGS = -fPIC -L${ZLib_cf_LIBRARY_DIR}#" Makefile && make
 )
 
