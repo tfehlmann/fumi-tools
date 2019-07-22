@@ -49,8 +49,6 @@ endif("${isSystemDir}" STREQUAL "-1")
 
 
 # add own modules to the search path
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/lib/seqan/util/cmake")
-
 # include add header and add sources
 include("${PROJECT_SOURCE_DIR}/CMake/CMakeUtils.cmake")
 # include compiler specific additional flags (e.g. {GCC,CLANG,MSVC}_CXX_FLAGS_{DEBUG,RELWITHDEBINFO,RELEASE})
@@ -91,28 +89,6 @@ get_property(TEST_FILES GLOBAL PROPERTY TESTS_LIST)
 set(ZLIB_LIBRARIES ${ZLib_cf_LIBRARY})
 set(ZLIB_INCLUDE_DIRS ${ZLib_cf_INCLUDE_DIR})
 set(ZLIB_FOUND True)
-
-set(SEQAN_FIND_DEBUG True)
-set(SEQAN_INCLUDE_PATH "${PROJECT_SOURCE_DIR}/lib/seqan/include")
-#set(SEQAN_FIND_DEPENDENCIES None)
-find_package(SeqAn REQUIRED)
-if(NOT SEQAN_FOUND)
-    message(FATAL_ERROR "Didn't find seqan library")
-else()
-    # Add include directories.
-    include_directories(SYSTEM ${SEQAN_INCLUDE_DIRS})
-
-    # Add definitions set by find_package (SeqAn).
-    add_definitions(${SEQAN_DEFINITIONS})
-    add_definitions(-DSEQAN_BGZF_NUM_THREADS=1 -DSEQAN_ENABLE_PARALLELISM=0 -DSEQAN_ASYNC_IO=1)
-    if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
-        remove_definitions(-DSEQAN_GLOBAL_EXCEPTION_HANDLER)
-    endif()
-    if(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
-        set(SEQAN_LIBRARIES ${SEQAN_LIBRARIES} execinfo)  # needed for backtrace_symbols and backtrace
-    endif()
-endif()
-
 
 
 if(__COMPILER_GNU AND NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") # GCC, MINGW
