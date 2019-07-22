@@ -1,0 +1,11 @@
+--- ZLib_cf-src/CMakeLists.txt.old	2018-08-23 10:41:36.800538147 +0200
++++ ZLib_cf-src/CMakeLists.txt	2018-08-23 10:42:10.786923049 +0200
+@@ -68,7 +68,7 @@
+ else()
+     CHECK_C_COMPILER_FLAG("-msse4.2" HAS_SSE)
+     if (HAS_SSE)
+-        set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} "-msse4.2")
++        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse4.2")
+     endif()
+ endif()
+ 

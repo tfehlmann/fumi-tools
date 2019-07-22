@@ -1,0 +1,111 @@
+#include <iostream>
+
+#include <cxxopts/cxxopts.hpp>
+
+#include <fmt/format.h>
+
+#include <gitversion/version.h>
+
+#include <fumi_tools/umi_opts.hpp>
+#include <fumi_tools/dedup.hpp>
+
+namespace {
+
+void required_options(cxxopts::Options& opts,
+                      std::initializer_list<std::string> req) {
+  for (auto& o : req) {
+    if (opts.count(o) == 0) {
+      throw std::runtime_error(fmt::format("Option '{}' is required!", o));
+    }
+  }
+}
+
+
+auto parse_options(int argc, char* argv[]) {
+  cxxopts::Options opts("fumi_tools", "Options");
+
+  fumi_tools::umi_opts umi_opts;
+
+  // clang-format off
+  opts.add_options()
+      ("i,input", "Single end FASTQ file to be cleaned. It can be compressed with gz or bz2.", cxxopts::value<std::string>())
+      ("o,output", "Output file (either FASTA or FASTQ).", cxxopts::value<std::string>())
+      ("method", "Preprocessing statistics and quality information.", cxxopts::value<std::string>()->default_value(""))
+      ("read-length", "In addition to the position, require the read-length to be the same.")
+      ("seed", "Random number generator seed.", cxxopts::value<uint64_t>(umi_opts.seed))
+      ("version", "Display version number.")
+      ("help", "Show this dialog.")
+      ("max-hamming-dist", "Maximum hamming distance for which to collapse umis.", cxxopts::value<uint32_t>(umi_opts.max_ham_dist)->default_value("1"))
+      ;
+  // clang-format on
+
+  try {
+    auto copy_argc = argc;
+    opts.parse_positional("input");
+    opts.parse(copy_argc, argv);
+    if (opts["help"].as<bool>()) {
+      std::cout << opts.help() << std::endl;
+      std::exit(0);
+    }
+    required_options(
+        opts, {"input", "output"});
+    umi_opts.read_length = opts["read-length"].as<bool>();
+  } catch (const std::exception& e) {
+    if (opts["help"].as<bool>() || argc == 1) {
+      std::cout << opts.help() << std::endl;
+      std::exit(0);
+    } else if (opts["version"].as<bool>()) {
+      std::cout << "fumi_tools: " << version::VERSION_STRING << std::endl;
+      std::exit(0);
+    } else {
+      std::cout << e.what() << std::endl;
+      std::exit(1);
+    }
+  }
+
+  return std::make_pair(opts, umi_opts);
+}
+
+enum class Format { BAM, SAM, UNKNOWN };
+
+bool ends_with(const std::string_view str,
+               const std::string_view ending) {
+  if (str.length() >= ending.length()) {
+    return (str.compare(str.length() - ending.length(), ending.length(),
+                        ending) == 0);
+  } else {
+    return false;
+  }
+}
+
+Format check_format(std::string_view sv) {
+  if (ends_with(sv, ".bam")) {
+    return Format::BAM;
+  } else if (ends_with(sv, ".sam")) {
+    return Format::SAM;
+  } else {
+    return Format::UNKNOWN;
+  }
+}
+}  // namespace
+
+int main(int argc, char* argv[]) {
+  auto vm_opts = parse_options(argc, argv);
+  auto fmt_in = check_format(vm_opts.first["input"].as<std::string>());
+  if (fmt_in == Format::UNKNOWN) {
+    std::cerr << "Unknown input format! Needs to be either bam|sam."
+              << std::endl;
+    return 1;
+  }
+  auto fmt_out = check_format(vm_opts.first["output"].as<std::string>());
+  if (fmt_out == Format::UNKNOWN) {
+    std::cerr << "Unknown output format! Needs to be either bam|sam."
+              << std::endl;
+    return 1;
+  }
+  fumi_tools::dedup(
+      vm_opts.first["input"].as<std::string>(),
+      vm_opts.first["output"].as<std::string>(),
+      vm_opts.second);
+  return 0;
+}

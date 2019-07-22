@@ -1,0 +1,9 @@
+[submodule "lib/zstr"]
+	path = lib/zstr
+	url = https://github.com/mateidavid/zstr.git
+[submodule "lib/cxxopts"]
+	path = lib/cxxopts
+	url = https://github.com/jarro2783/cxxopts.git
+[submodule "lib/robin-hood-hashing"]
+	path = lib/robin-hood-hashing
+	url = https://github.com/martinus/robin-hood-hashing.git
