@@ -66,15 +66,12 @@ include_directories("${PROJECT_SOURCE_DIR}/include")
 
 # extra library include paths
 include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/lib/")
-#include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/lib/Catch-include")
 include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/lib/zstr-include")
 include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/lib/cxxopts-include")
 include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/lib/robin-hood-hashing-include")
 include_directories(SYSTEM ${cppformat_INCLUDE_DIR})
 include_directories(SYSTEM ${htslib_INCLUDE_DIR})
 include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/lib/cpg/include")
-#include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/lib/array-hash")
-#include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/lib/cityhash")
 
 # add code subdirectories
 add_subdirectory(include)
@@ -145,18 +142,10 @@ else()
     add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${HEADER_FILES})
 endif()
 
-# add the executable
 add_executable(${PROJECT_NAME}-bin ${MAIN_FILE})
 set_target_properties(${PROJECT_NAME}-bin
   PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
 target_git_version_init(${PROJECT_NAME}-bin)
-
-# add the executable
-#add_executable(${PROJECT_NAME}_tests ${TEST_FILES})
-
-find_package(LibLZMA REQUIRED)
-find_package(BZip2 REQUIRED)
-find_package(CURL REQUIRED)
 
 add_dependencies(${PROJECT_NAME} ${cppformat_LIBRARY} ${ZLib_cf_LIBRARY} ${htslib_LIBRARY})
 
@@ -168,11 +157,9 @@ if(NOT WIN32)
     endif()
     target_link_libraries(${PROJECT_NAME} ${COMMON_LIBS} rt pthread)
     target_link_libraries(${PROJECT_NAME}-bin ${PROJECT_NAME})
-    #    target_link_libraries(${PROJECT_NAME}_tests ${PROJECT_NAME})
 else()
     target_link_libraries(${PROJECT_NAME} ${COMMON_LIBS})
     target_link_libraries(${PROJECT_NAME}-bin ${PROJECT_NAME} ws2_32)
-    #    target_link_libraries(${PROJECT_NAME}_tests ${PROJECT_NAME} ws2_32)
 endif()
 
 install(TARGETS ${PROJECT_NAME}-bin DESTINATION bin)
