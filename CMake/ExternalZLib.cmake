@@ -41,6 +41,7 @@ ExternalProject_Add(
   "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
   "-DCMAKE_C_FLAGS=${ZLIB_C_FLAGS}"
   "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
+  "-DBUILD_SHARED_LIBS=OFF"
   INSTALL_COMMAND
     "${CMAKE_COMMAND}"
     --build .
@@ -56,11 +57,7 @@ list(APPEND ${name}_INCLUDE_DIRS "${install}/include")
 set(${name}_INCLUDE_DIR "${${name}_INCLUDE_DIRS}")
 
 # library dir
-if(NOT ${BUILD_SHARED_LIBS})
-  set(${name}_LIBRARY_PATH ${install}/lib/libz.a)
-else()
-  set(${name}_LIBRARY_PATH ${install}/lib/libz.so)
-endif()
+set(${name}_LIBRARY_PATH ${install}/lib/libz.a)
 
 set(${name}_LIBRARY ZLib_cf)
 add_library(${${name}_LIBRARY} UNKNOWN IMPORTED)
