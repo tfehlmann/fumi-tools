@@ -38,5 +38,8 @@ set(${name}_LIBRARY htslib)
 add_library(${${name}_LIBRARY} UNKNOWN IMPORTED)
 set_property(TARGET ${${name}_LIBRARY} PROPERTY IMPORTED_LOCATION
                 ${${name}_LIBRARY_PATH})
+
+# zlib must be downloaded and compiled before
+add_dependencies(${name}_project ${ZLib_cf_LIBRARY})
 add_dependencies(${${name}_LIBRARY} ${name}_project)
 
