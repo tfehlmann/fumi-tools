@@ -56,11 +56,7 @@ list(APPEND ${name}_INCLUDE_DIRS "${install}/include")
 set(${name}_INCLUDE_DIR "${${name}_INCLUDE_DIRS}")
 
 # library dir
-if(NOT ${BUILD_SHARED_LIBS})
-  set(${name}_LIBRARY_PATH ${install}/lib/libz.a)
-else()
-  set(${name}_LIBRARY_PATH ${install}/lib/libz.so)
-endif()
+set(${name}_LIBRARY_PATH ${install}/lib/libz.a)
 
 set(${name}_LIBRARY ZLib_cf)
 add_library(${${name}_LIBRARY} UNKNOWN IMPORTED)
