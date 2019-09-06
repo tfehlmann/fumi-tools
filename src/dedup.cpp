@@ -84,7 +84,6 @@ std::tuple<uint64_t, uint64_t, bool> get_read_position(
   auto* cigar = bam_get_cigar(read);
   auto n_cigar = read->core.n_cigar;
   if ((read->core.flag & BAM_FUNMAP) != 0) {
-    // auto aln_len = seqan::getAlignmentLengthInRef(read);
     auto pos = bam_endpos(read);
     if ((cigar[n_cigar - 1] & BAM_CIGAR_MASK) == BAM_CSOFT_CLIP) {
       auto count = cigar[n_cigar - 1] >> BAM_CIGAR_SHIFT;
