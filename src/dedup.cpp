@@ -274,7 +274,7 @@ void dedup(const std::string& input, const std::string& output, umi_opts opts) {
         fmt::format("BAM file needs to be coordinate sorted!"));
   }
 
-  samFile* out = hts_open(output.c_str(), "wb");
+  samFile* out = hts_open(output.c_str(), ends_with(output, ".bam") ? "wb" : "w");
   if (out == nullptr) {
     throw std::runtime_error(fmt::format("Could not open file '{}'", output));
   }

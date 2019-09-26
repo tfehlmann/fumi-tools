@@ -7,6 +7,8 @@
 
 #include <htslib/sam.h>
 
+#include <nonstd/string_view.hpp>
+
 namespace fumi_tools {
 
 namespace {
@@ -36,6 +38,16 @@ bool operator<(const read_group& lhs, const read_group& rhs){
 bool operator==(const read_group& lhs, const read_group& rhs) {
   return lhs.is_reversed == rhs.is_reversed &&
          lhs.is_spliced == rhs.is_spliced && lhs.read_len == rhs.read_len;
+}
+
+bool ends_with(const nonstd::string_view str,
+               const nonstd::string_view ending) {
+  if (str.length() >= ending.length()) {
+    return (str.compare(str.length() - ending.length(), ending.length(),
+                        ending) == 0);
+  } else {
+    return false;
+  }
 }
 }
 }  // namespace fumi_tools

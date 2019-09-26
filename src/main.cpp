@@ -10,6 +10,7 @@
 
 #include <fumi_tools/umi_opts.hpp>
 #include <fumi_tools/dedup.hpp>
+#include <fumi_tools/helper.hpp>
 
 namespace {
 
@@ -70,20 +71,10 @@ auto parse_options(int argc, char* argv[]) {
 
 enum class Format { BAM, SAM, UNKNOWN };
 
-bool ends_with(const nonstd::string_view str,
-               const nonstd::string_view ending) {
-  if (str.length() >= ending.length()) {
-    return (str.compare(str.length() - ending.length(), ending.length(),
-                        ending) == 0);
-  } else {
-    return false;
-  }
-}
-
 Format check_format(nonstd::string_view sv) {
-  if (ends_with(sv, ".bam")) {
+  if (fumi_tools::ends_with(sv, ".bam")) {
     return Format::BAM;
-  } else if (ends_with(sv, ".sam")) {
+  } else if (fumi_tools::ends_with(sv, ".sam")) {
     return Format::SAM;
   } else {
     return Format::UNKNOWN;

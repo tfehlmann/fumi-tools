@@ -8,12 +8,12 @@ project(fumi_tools)
 
 # Use Debug as default build
 if(NOT DEFINED CMAKE_BUILD_TYPE)
-	set(CMAKE_BUILD_TYPE Debug)
+        set(CMAKE_BUILD_TYPE Release)
 endif()
 
 #configure static linking
 option(BUILD_SHARED_LIBS "Build a shared (ON) or static (OFF) executable" ON)
-option(BUILD_GENERIC "Build so that the code runs on other x86-64 CPUs as well" OFF)
+option(BUILD_GENERIC "Build so that the code runs on other x86-64 CPUs as well" ON)
 option(USE_LIBCPP "Use libc++ instead of libstdc++" OFF)
 option(USE_CXXABI "Use cxxabi for clang" OFF)
 
