@@ -3,7 +3,8 @@
 
 #include <memory>
 #include <string>
-#include <string_view>
+
+#include <nonstd/string_view.hpp>
 
 #include <htslib/sam.h>
 
@@ -14,7 +15,7 @@
 namespace fumi_tools {
 class umi_clusterer {
  public:
-  explicit umi_clusterer(std::string_view method = "unique"):
+  explicit umi_clusterer(nonstd::string_view method = "unique"):
         method_(method) {}
 
   template <class Fun>
@@ -24,8 +25,8 @@ class umi_clusterer {
           bundle,
           Fun fun) {
     if (method_ == "unique") {
-        for(auto& [umi, info]: bundle){
-            fun(info.first, umi, info.second);
+        for(auto& umi_info: bundle){
+            fun(umi_info.second.first, umi_info.first, umi_info.second.second);
         }
     }
   }

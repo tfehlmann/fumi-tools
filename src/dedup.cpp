@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <random>
-#include <string_view>
+
+#include <nonstd/optional.hpp>
+#include <nonstd/string_view.hpp>
 
 #include <cpg/cpg.hpp>
 
@@ -23,11 +25,11 @@ std::mt19937 rand_gen;
 std::uniform_real_distribution<> udistrib(0, 1);
 }  // namespace
 
-std::string_view get_umi(const char* c, uint8_t len) {
-  auto res = std::string_view(c, len);
+nonstd::string_view get_umi(const char* c, uint8_t len) {
+  auto res = nonstd::string_view(c, len);
   auto pos = res.rfind('_');
-  if (pos == std::string_view::npos) {
-    throw std::runtime_error(fmt::format("Did not find umi for read {}!", res));
+  if (pos == nonstd::string_view::npos) {
+    throw std::runtime_error(fmt::format("Did not find umi for read {}!", res.to_string()));
   }
   return res.substr(res.rfind('_') + 1);
 }
@@ -98,7 +100,7 @@ std::tuple<uint64_t, uint64_t, bool> get_read_position(
     return std::tie(start, pos, is_spliced);
   } else {
     auto pos = read->core.pos;
-    if ((cigar[0] & BAM_CIGAR_MASK) == 'S') {
+    if ((cigar[0] & BAM_CIGAR_MASK) == BAM_CSOFT_CLIP) {
       pos -= cigar[0] & BAM_CIGAR_SHIFT;
     }
     auto start = pos;
@@ -176,12 +178,12 @@ void process_bam_read_chunks(samFile* file, bam_hdr_t* bam_hdr, umi_opts opts,
       read_counts;
 
   auto output_positions = [&read_map, &read_counts,
-                           &fun](std::optional<uint64_t> start) {
+                           &fun](nonstd::optional<uint64_t> start) {
     std::vector<uint64_t> positions;
     positions.reserve(read_map.size());
-    for (auto& [k, v] : read_map) {
-      if (!start.has_value() || k + 1000 < start) {
-        positions.push_back(k);
+    for (auto& k_v : read_map) {
+      if (!start.has_value() || k_v.first + 1000 < start) {
+        positions.push_back(k_v.first);
       }
     }
     std::sort(positions.begin(), positions.end());
@@ -189,8 +191,8 @@ void process_bam_read_chunks(samFile* file, bam_hdr_t* bam_hdr, umi_opts opts,
       std::vector<read_group> sorted_keys;
       sorted_keys.reserve(read_map.size());
       auto& map_p = read_map[p];
-      for (auto& [k, v] : read_map[p]) {
-        sorted_keys.push_back(k);
+      for (auto& k_v : read_map[p]) {
+        sorted_keys.push_back(k_v.first);
       }
       std::sort(sorted_keys.begin(), sorted_keys.end());
       for (auto& k : sorted_keys) {
@@ -216,12 +218,15 @@ void process_bam_read_chunks(samFile* file, bam_hdr_t* bam_hdr, umi_opts opts,
       cur_ref = record->core.tid;
       auto* qname = bam_get_qname(record);
       auto umi = get_umi(qname, ::strlen(qname));
-      auto [start, pos, is_spliced] =
+      uint64_t start = 0;
+      uint64_t pos = 0;
+      bool is_spliced = false;
+      std::tie(start, pos, is_spliced) =
           get_read_position(record, opts.soft_clip_threshold);
 
       // new ref, so output all previous reads
       if(cur_ref != last_ref){
-          output_positions(std::nullopt);
+          output_positions(nonstd::nullopt);
           last_output_pos = 0;
       } else if (last_output_pos + 1000 < start) {
         output_positions(start);
@@ -238,7 +243,7 @@ void process_bam_read_chunks(samFile* file, bam_hdr_t* bam_hdr, umi_opts opts,
     }
     progress.update();
   }
-  output_positions(std::nullopt);
+  output_positions(nonstd::nullopt);
   bam_destroy1(record);
 }
 

@@ -1,5 +1,7 @@
 #include <iostream>
 
+#include <nonstd/string_view.hpp>
+
 #include <cxxopts/cxxopts.hpp>
 
 #include <fmt/format.h>
@@ -68,8 +70,8 @@ auto parse_options(int argc, char* argv[]) {
 
 enum class Format { BAM, SAM, UNKNOWN };
 
-bool ends_with(const std::string_view str,
-               const std::string_view ending) {
+bool ends_with(const nonstd::string_view str,
+               const nonstd::string_view ending) {
   if (str.length() >= ending.length()) {
     return (str.compare(str.length() - ending.length(), ending.length(),
                         ending) == 0);
@@ -78,7 +80,7 @@ bool ends_with(const std::string_view str,
   }
 }
 
-Format check_format(std::string_view sv) {
+Format check_format(nonstd::string_view sv) {
   if (ends_with(sv, ".bam")) {
     return Format::BAM;
   } else if (ends_with(sv, ".sam")) {

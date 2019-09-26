@@ -72,6 +72,8 @@ include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/lib/robin-hood-hashing-include
 include_directories(SYSTEM ${cppformat_INCLUDE_DIR})
 include_directories(SYSTEM ${htslib_INCLUDE_DIR})
 include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/lib/cpg/include")
+include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/lib/string-view-lite/include")
+include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/lib/optional-lite/include")
 
 # add code subdirectories
 add_subdirectory(include)
@@ -90,7 +92,7 @@ set(ZLIB_FOUND True)
 
 
 if(__COMPILER_GNU AND NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") # GCC, MINGW
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -pthread")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -pthread")
         set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${GCC_CXX_FLAGS_DEBUG}")
         set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -pipe -march=native -fsanitize=address")
         if(${BUILD_GENERIC})
@@ -110,7 +112,7 @@ if(__COMPILER_GNU AND NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") # GCC, MI
 endif()
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -pthread")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -pthread")
         if(${USE_LIBCPP})
             set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
         else()
@@ -136,11 +138,8 @@ if(WIN32)
     add_definitions(-D_WIN32_WINNT=0x0601)
 endif()
 
-if(NOT ${BUILD_SHARED_LIBS})
-    add_library(${PROJECT_NAME} STATIC ${SOURCE_FILES} ${HEADER_FILES})
-else()
-    add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${HEADER_FILES})
-endif()
+
+add_library(${PROJECT_NAME} STATIC ${SOURCE_FILES} ${HEADER_FILES})
 
 add_executable(${PROJECT_NAME}-bin ${MAIN_FILE})
 set_target_properties(${PROJECT_NAME}-bin
@@ -149,7 +148,7 @@ target_git_version_init(${PROJECT_NAME}-bin)
 
 add_dependencies(${PROJECT_NAME} ${cppformat_LIBRARY} ${ZLib_cf_LIBRARY} ${htslib_LIBRARY})
 
-set(COMMON_LIBS ${ZLib_cf_LIBRARY} ${cppformat_LIBRARY} ${htslib_LIBRARY} ${BZIP2_LIBRARIES} ${LIBLZMA_LIBRARIES} ${CURL_LIBRARIES})
+set(COMMON_LIBS ${cppformat_LIBRARY} ${htslib_LIBRARY} ${BZIP2_LIBRARIES} ${LIBLZMA_LIBRARIES} ${CURL_LIBRARIES} ${ZLib_cf_LIBRARY})
 # link with libraries
 if(NOT WIN32)
     if(${CMAKE_SYSTEM_NAME} MATCHES "Linux" AND ${USE_CXXABI})
