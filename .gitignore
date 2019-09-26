@@ -2,3 +2,4 @@ build*
 build_env_setup.sh
 conda_build.sh
 metadata_conda_debug.yaml
+CMakeLists.txt.user
