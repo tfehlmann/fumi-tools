@@ -28,14 +28,14 @@ auto parse_options(int argc, char* argv[]) {
 
   // clang-format off
   opts.add_options()
-      ("i,input", "Single end FASTQ file to be cleaned. It can be compressed with gz or bz2.", cxxopts::value<std::string>())
-      ("o,output", "Output file (either FASTA or FASTQ).", cxxopts::value<std::string>())
-      ("method", "Preprocessing statistics and quality information.", cxxopts::value<std::string>()->default_value(""))
+      ("i,input", "Input SAM or BAM file.", cxxopts::value<std::string>())
+      ("o,output", "Output SAM or BAM file.", cxxopts::value<std::string>())
+//      ("method", "Which method to use to collapse the UMIs. ", cxxopts::value<std::string>()->default_value("")) only unique supported for now
       ("read-length", "In addition to the position, require the read-length to be the same.")
       ("seed", "Random number generator seed.", cxxopts::value<uint64_t>(umi_opts.seed))
       ("version", "Display version number.")
       ("help", "Show this dialog.")
-      ("max-hamming-dist", "Maximum hamming distance for which to collapse umis.", cxxopts::value<uint32_t>(umi_opts.max_ham_dist)->default_value("1"))
+//      ("max-hamming-dist", "Maximum hamming distance for which to collapse umis.", cxxopts::value<uint32_t>(umi_opts.max_ham_dist)->default_value("1")) not yet supported
       ;
   // clang-format on
 
