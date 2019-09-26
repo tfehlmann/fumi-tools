@@ -219,7 +219,11 @@ void process_bam_read_chunks(samFile* file, bam_hdr_t* bam_hdr, umi_opts opts,
       auto [start, pos, is_spliced] =
           get_read_position(record, opts.soft_clip_threshold);
 
-      if (last_output_pos + 1000 < start || cur_ref != last_ref) {
+      // new ref, so output all previous reads
+      if(cur_ref != last_ref){
+          output_positions(std::nullopt);
+          last_output_pos = 0;
+      } else if (last_output_pos + 1000 < start) {
         output_positions(start);
         last_output_pos = start;
       }

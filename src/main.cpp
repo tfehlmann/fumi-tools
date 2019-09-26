@@ -31,7 +31,7 @@ auto parse_options(int argc, char* argv[]) {
       ("i,input", "Input SAM or BAM file.", cxxopts::value<std::string>())
       ("o,output", "Output SAM or BAM file.", cxxopts::value<std::string>())
 //      ("method", "Which method to use to collapse the UMIs. ", cxxopts::value<std::string>()->default_value("")) only unique supported for now
-      ("read-length", "In addition to the position, require the read-length to be the same.")
+      ("start-only", "Reads only need the same start position and the same UMI to be considered duplicates.")
       ("seed", "Random number generator seed.", cxxopts::value<uint64_t>(umi_opts.seed))
       ("version", "Display version number.")
       ("help", "Show this dialog.")
@@ -49,7 +49,7 @@ auto parse_options(int argc, char* argv[]) {
     }
     required_options(
         opts, {"input", "output"});
-    umi_opts.read_length = opts["read-length"].as<bool>();
+    umi_opts.read_length = !opts["start-only"].as<bool>();
   } catch (const std::exception& e) {
     if (opts["help"].as<bool>() || argc == 1) {
       std::cout << opts.help() << std::endl;
