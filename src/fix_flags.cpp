@@ -210,6 +210,7 @@ int main(int argc, char* argv[]) {
                 << std::endl;
       return 1;
     }
-    fumi_tools::fix_flags(argv[1], argv[2]);
+    fumi_tools::fix_flags(vm_opts["input"].as<std::string>(),
+                          vm_opts["output"].as<std::string>());
     return 0;
 }
