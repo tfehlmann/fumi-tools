@@ -13,6 +13,7 @@ struct umi_opts {
   bool spliced = false;
   uint64_t seed = 42;
   std::string method = "unique";
+  bool uncompressed = false;
 };
 
 }  // namespace fumi_tools

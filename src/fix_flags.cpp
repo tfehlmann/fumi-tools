@@ -165,20 +165,21 @@ namespace fumi_tools {
         // read header
         bam_hdr_t* bam_hdr = sam_hdr_read(file);
 
-        // require sorted bam file
-        if ((bam_hdr->l_text > 3) && (strncmp(bam_hdr->text, "@HD", 3) == 0)) {
-          auto* p = strstr(bam_hdr->text, "\tSO:queryname");
-          auto* q = strchr(bam_hdr->text, '\n');
-          // Looking for SO:queryname within the @HD line only
-          // (e.g. must ignore in a @CO comment line later in header)
-          if ((p == nullptr) || (p >= q)) {
-            throw std::runtime_error(
-                fmt::format("BAM file needs to be read name sorted!"));
-          }
-        } else {
-          throw std::runtime_error(
-              fmt::format("BAM file needs to be read name sorted!"));
-        }
+//        Don't require sorted file, grouping by reads is enough
+//        // require sorted bam file
+//        if ((bam_hdr->l_text > 3) && (strncmp(bam_hdr->text, "@HD", 3) == 0)) {
+//          auto* p = strstr(bam_hdr->text, "\tSO:queryname");
+//          auto* q = strchr(bam_hdr->text, '\n');
+//          // Looking for SO:queryname within the @HD line only
+//          // (e.g. must ignore in a @CO comment line later in header)
+//          if ((p == nullptr) || (p >= q)) {
+//            throw std::runtime_error(
+//                fmt::format("BAM file needs to be read name sorted!"));
+//          }
+//        } else {
+//          throw std::runtime_error(
+//              fmt::format("BAM file needs to be read name sorted!"));
+//        }
 
         samFile* out = hts_open(output.c_str(), ends_with(output, ".bam") ? "wb" : "w");
         if (out == nullptr) {
