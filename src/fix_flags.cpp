@@ -191,6 +191,11 @@ namespace fumi_tools {
         }
 
         process_bam_read_chunks(file, bam_hdr, out);
+
+        bam_hdr_destroy(bam_hdr);
+
+        hts_close(file);
+        hts_close(out);
     }
 }
 
