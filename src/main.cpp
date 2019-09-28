@@ -23,6 +23,19 @@ void required_options(cxxopts::Options& opts,
   }
 }
 
+enum class Format { BAM, SAM, UNKNOWN };
+
+Format check_format(nonstd::string_view sv) {
+  if(sv == "-"){
+    return Format::SAM;
+  } else if (fumi_tools::ends_with(sv, ".bam")) {
+    return Format::BAM;
+  } else if (fumi_tools::ends_with(sv, ".sam")) {
+    return Format::SAM;
+  } else {
+    return Format::UNKNOWN;
+  }
+}
 
 auto parse_options(int argc, char* argv[]) {
   cxxopts::Options opts("fumi_tools", "Options");
@@ -30,15 +43,19 @@ auto parse_options(int argc, char* argv[]) {
   fumi_tools::umi_opts umi_opts;
 
   // clang-format off
-  opts.add_options()
+  opts.add_options("help")
       ("i,input", "Input SAM or BAM file.", cxxopts::value<std::string>())
-      ("o,output", "Output SAM or BAM file.", cxxopts::value<std::string>())
+      ("o,output", "Output SAM or BAM file. To output SAM on stdout use '-'.", cxxopts::value<std::string>())
 //      ("method", "Which method to use to collapse the UMIs. ", cxxopts::value<std::string>()->default_value("")) only unique supported for now
       ("start-only", "Reads only need the same start position and the same UMI to be considered duplicates.")
       ("seed", "Random number generator seed.", cxxopts::value<uint64_t>(umi_opts.seed))
       ("version", "Display version number.")
-      ("help", "Show this dialog.")
+      ("h,help", "Show this dialog.")
 //      ("max-hamming-dist", "Maximum hamming distance for which to collapse umis.", cxxopts::value<uint32_t>(umi_opts.max_ham_dist)->default_value("1")) not yet supported
+      ;
+
+  opts.add_options("invisible")
+      ("parse_opts", "Only parse options but don't do anything")
       ;
   // clang-format on
 
@@ -47,7 +64,7 @@ auto parse_options(int argc, char* argv[]) {
     opts.parse_positional("input");
     opts.parse(copy_argc, argv);
     if (opts["help"].as<bool>()) {
-      std::cout << opts.help() << std::endl;
+      std::cout << opts.help({"help"}) << std::endl;
       std::exit(0);
     }
     required_options(
@@ -55,7 +72,7 @@ auto parse_options(int argc, char* argv[]) {
     umi_opts.read_length = !opts["start-only"].as<bool>();
   } catch (const std::exception& e) {
     if (opts["help"].as<bool>() || argc == 1) {
-      std::cout << opts.help() << std::endl;
+      std::cout << opts.help({"help"}) << std::endl;
       std::exit(0);
     } else if (opts["version"].as<bool>()) {
       std::cout << "fumi_tools: " << version::VERSION_STRING << std::endl;
@@ -66,36 +83,35 @@ auto parse_options(int argc, char* argv[]) {
     }
   }
 
-  return std::make_pair(opts, umi_opts);
-}
-
-enum class Format { BAM, SAM, UNKNOWN };
-
-Format check_format(nonstd::string_view sv) {
-  if (fumi_tools::ends_with(sv, ".bam")) {
-    return Format::BAM;
-  } else if (fumi_tools::ends_with(sv, ".sam")) {
-    return Format::SAM;
-  } else {
-    return Format::UNKNOWN;
-  }
-}
-}  // namespace
-
-int main(int argc, char* argv[]) {
-  auto vm_opts = parse_options(argc, argv);
-  auto fmt_in = check_format(vm_opts.first["input"].as<std::string>());
+  auto fmt_in = check_format(opts["input"].as<std::string>());
   if (fmt_in == Format::UNKNOWN) {
     std::cerr << "Unknown input format! Needs to be either bam|sam."
               << std::endl;
-    return 1;
+    std::exit(1);
   }
-  auto fmt_out = check_format(vm_opts.first["output"].as<std::string>());
+  auto fmt_out = check_format(opts["output"].as<std::string>());
   if (fmt_out == Format::UNKNOWN) {
     std::cerr << "Unknown output format! Needs to be either bam|sam."
               << std::endl;
-    return 1;
+    std::exit(1);
   }
+
+  return std::make_pair(opts, umi_opts);
+}
+
+
+}  // namespace
+
+int main(int argc, char* argv[]) {
+  // no need to sync
+  std::ios_base::sync_with_stdio(false);
+  auto vm_opts = parse_options(argc, argv);
+
+  // only parse options and return
+  if(vm_opts.first.count("parse_opts") != 0){
+      return 0;
+  }
+
   fumi_tools::dedup(
       vm_opts.first["input"].as<std::string>(),
       vm_opts.first["output"].as<std::string>(),

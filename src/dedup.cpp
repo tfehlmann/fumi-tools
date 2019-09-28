@@ -1,6 +1,7 @@
 #include <fumi_tools/dedup.hpp>
 
 #include <algorithm>
+#include <iostream>
 #include <random>
 
 #include <nonstd/optional.hpp>
@@ -132,8 +133,8 @@ void update_read_map(
   if (it != std::end(read_map[pos][key])) {
     auto& res = it->second;
     res.second += 1;
-    auto read_qual = bam_get_qual(read);
-    auto other_qual = bam_get_qual(res.first);
+    auto read_qual = read->core.qual;
+    auto other_qual = res.first->core.qual;
     if (read_qual < other_qual) {
       return;
     }
@@ -209,6 +210,7 @@ void process_bam_read_chunks(samFile* file, bam_hdr_t* bam_hdr, umi_opts opts,
   prog_cfg.unit = "aln";
   prog_cfg.unit_scale = true;
   prog_cfg.mininterval = 3;
+  prog_cfg.desc = "Dedup UMIs";
 
   auto progress = cpg::cpg(prog_cfg);
 
@@ -217,7 +219,7 @@ void process_bam_read_chunks(samFile* file, bam_hdr_t* bam_hdr, umi_opts opts,
     if ((record->core.flag & BAM_FUNMAP) == 0) {
       cur_ref = record->core.tid;
       auto* qname = bam_get_qname(record);
-      auto umi = get_umi(qname, ::strlen(qname));
+      auto umi = get_umi(qname, record->core.l_qname);
       uint64_t start = 0;
       uint64_t pos = 0;
       bool is_spliced = false;
@@ -286,8 +288,11 @@ void dedup(const std::string& input, const std::string& output, umi_opts opts) {
   umi_clusterer clusterer(opts.method);
   process_bam_read_chunks(
       file, bam_hdr, opts, [&clusterer, &out, &bam_hdr](auto& bundle) {
-        clusterer(bundle, [&out, &bam_hdr](auto& read, auto& umi, auto& count) {
-          sam_write1(out, bam_hdr, read.get());
+        clusterer(bundle, [&out, &bam_hdr](auto& read, auto& /*umi*/, auto& /*count*/) {
+          if(sam_write1(out, bam_hdr, read.get()) < 0){
+            std::cerr << "Failed to write to output file!" << std::endl;
+            std::exit(1);
+          }
         });
       });
   bam_hdr_destroy(bam_hdr);

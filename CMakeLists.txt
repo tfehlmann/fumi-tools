@@ -41,11 +41,12 @@ set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 # which point to directories outside the build tree to the install RPATH
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
+# NOT NEEDED RIGHT NOW BECAUSE LIBS ARE STATIC
 # the RPATH to be used when installing, but only if it's not a system directory
-list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
-if("${isSystemDir}" STREQUAL "-1")
-   set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
-endif("${isSystemDir}" STREQUAL "-1")
+#list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
+#if("${isSystemDir}" STREQUAL "-1")
+#   set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
+#endif("${isSystemDir}" STREQUAL "-1")
 
 
 # add own modules to the search path
@@ -142,9 +143,14 @@ endif()
 add_library(${PROJECT_NAME} STATIC ${SOURCE_FILES} ${HEADER_FILES})
 
 add_executable(${PROJECT_NAME}-bin ${MAIN_FILE})
+add_executable(${PROJECT_NAME}-fix-flags-bin src/fix_flags.cpp)
 set_target_properties(${PROJECT_NAME}-bin
-  PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
+  PROPERTIES OUTPUT_NAME ${PROJECT_NAME}_dedup)
 target_git_version_init(${PROJECT_NAME}-bin)
+
+set_target_properties(${PROJECT_NAME}-fix-flags-bin
+  PROPERTIES OUTPUT_NAME ${PROJECT_NAME}_fix_flags)
+target_git_version_init(${PROJECT_NAME}-fix-flags-bin)
 
 add_dependencies(${PROJECT_NAME} ${cppformat_LIBRARY} ${ZLib_cf_LIBRARY} ${htslib_LIBRARY})
 
@@ -156,11 +162,14 @@ if(NOT WIN32)
     endif()
     target_link_libraries(${PROJECT_NAME} ${COMMON_LIBS} rt pthread)
     target_link_libraries(${PROJECT_NAME}-bin ${PROJECT_NAME})
+    target_link_libraries(${PROJECT_NAME}-fix-flags-bin ${PROJECT_NAME})
 else()
     target_link_libraries(${PROJECT_NAME} ${COMMON_LIBS})
     target_link_libraries(${PROJECT_NAME}-bin ${PROJECT_NAME} ws2_32)
+    target_link_libraries(${PROJECT_NAME}-fix-flags-bin ${PROJECT_NAME} ws2_32)
 endif()
 
 install(TARGETS ${PROJECT_NAME}-bin DESTINATION bin)
-install(TARGETS ${PROJECT_NAME} DESTINATION lib)
-install(FILES ${HEADER_FILES} DESTINATION include/fumi_tools/)
+install(TARGETS ${PROJECT_NAME}-fix-flags-bin DESTINATION bin)
+#install(FILES ${HEADER_FILES} DESTINATION include/fumi_tools/)
+install(PROGRAMS ${PROJECT_SOURCE_DIR}/bin/fumi_tools DESTINATION bin)
