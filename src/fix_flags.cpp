@@ -34,6 +34,8 @@ auto parse_options(int argc, char* argv[]) {
   opts.add_options()
       ("i,input", "Input SAM or BAM file.", cxxopts::value<std::string>())
       ("o,output", "Output SAM or BAM file.", cxxopts::value<std::string>())
+      ("input-threads", "", cxxopts::value<uint64_t>()->default_value("1"))
+      ("output-threads", "", cxxopts::value<uint64_t>()->default_value("1"))
       ("version", "Display version number.")
       ("help", "Show this dialog.")
       ;
@@ -155,11 +157,15 @@ namespace fumi_tools {
       bam_destroy1(record);
     }
   }
-    void fix_flags(const std::string& input, const std::string& output){
+    void fix_flags(const std::string& input, const std::string& output, uint64_t ithreads, uint64_t othreads){
         samFile* file = hts_open(input.c_str(), "r");
 
         if (file == nullptr) {
           throw std::runtime_error(fmt::format("Could not open file '{}'", input));
+        }
+
+        if(ithreads > 1) {
+          hts_set_threads(file, ithreads);
         }
 
         // read header
@@ -185,6 +191,11 @@ namespace fumi_tools {
         if (out == nullptr) {
           throw std::runtime_error(fmt::format("Could not open file '{}'", output));
         }
+
+        if (othreads > 1) {
+          hts_set_threads(out, othreads);
+        }
+
         if (sam_hdr_write(out, bam_hdr) < -1) {
           throw std::runtime_error(
               fmt::format("Could not write header to file '{}'", output));
@@ -217,6 +228,8 @@ int main(int argc, char* argv[]) {
       return 1;
     }
     fumi_tools::fix_flags(vm_opts["input"].as<std::string>(),
-                          vm_opts["output"].as<std::string>());
+                          vm_opts["output"].as<std::string>(),
+                          vm_opts["input-threads"].as<uint64_t>(),
+                          vm_opts["output-threads"].as<uint64_t>());
     return 0;
 }

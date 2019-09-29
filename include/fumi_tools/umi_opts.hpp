@@ -14,6 +14,8 @@ struct umi_opts {
   uint64_t seed = 42;
   std::string method = "unique";
   bool uncompressed = false;
+  uint64_t ithreads = 1;
+  uint64_t othreads = 1;
 };
 
 }  // namespace fumi_tools

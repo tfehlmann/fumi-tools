@@ -57,6 +57,8 @@ auto parse_options(int argc, char* argv[]) {
 
   opts.add_options("invisible")
       ("parse_opts", "Only parse options but don't do anything")
+      ("input-threads", "", cxxopts::value<uint64_t>(umi_opts.ithreads)->default_value("1"))
+      ("output-threads", "", cxxopts::value<uint64_t>(umi_opts.othreads)->default_value("1"))
       ;
   // clang-format on
 

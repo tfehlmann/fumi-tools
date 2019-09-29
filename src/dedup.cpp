@@ -258,6 +258,10 @@ void dedup(const std::string& input, const std::string& output, umi_opts opts) {
     throw std::runtime_error(fmt::format("Could not open file '{}'", input));
   }
 
+  if (opts.ithreads > 1) {
+    hts_set_threads(file, opts.ithreads);
+  }
+
   // read header
   bam_hdr_t* bam_hdr = sam_hdr_read(file);
 
@@ -280,6 +284,11 @@ void dedup(const std::string& input, const std::string& output, umi_opts opts) {
   if (out == nullptr) {
     throw std::runtime_error(fmt::format("Could not open file '{}'", output));
   }
+
+  if (opts.othreads > 1) {
+    hts_set_threads(out, opts.othreads);
+  }
+
   if (sam_hdr_write(out, bam_hdr) < -1) {
     throw std::runtime_error(
         fmt::format("Could not write header to file '{}'", output));
