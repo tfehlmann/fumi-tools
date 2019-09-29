@@ -98,16 +98,46 @@ namespace fumi_tools {
 
   void fix_and_output_read_flags(const std::vector<std::unique_ptr<bam1_t, bam1_t_deleter>>& reads, bam_hdr_t* bam_hdr, samFile* outfile){
       // use the mapping quality to determine which alignment should be the primary alignment
+      if(reads.empty()){
+          return;
+      }
       auto best_mapq_i = 0ul;
       auto best_mapq = 0;
+
+      // collect second best alignment score, if available, to update the XS tag accordingly
+      auto best_as = -1000l;
+      auto second_best_as = -1000l;
+      auto best_as_i = 0l;
+      auto second_best_as_i = -1l;
+      auto has_nh = bam_aux_get(reads[0].get(), "NH") != nullptr;
+      auto has_as = bam_aux_get(reads[0].get(), "AS") != nullptr;
       for(auto i = 0ul; i < reads.size(); ++i){
-        auto* nh_tag = bam_aux_get(reads[i].get(), "NH");
-        auto num_hits = bam_aux2i(nh_tag);
-        // adjust number of hits and accordingly number the hit indicies
-        if(num_hits != as_signed(reads.size())){
-            bam_aux_update_int(reads[i].get(), "NH", as_signed(reads.size()));
-            bam_aux_update_int(reads[i].get(), "HI", as_signed(i+1));
+        if(has_nh){
+          auto* nh_tag = bam_aux_get(reads[i].get(), "NH");
+          if(nh_tag){
+              auto num_hits = bam_aux2i(nh_tag);
+              // adjust number of hits and accordingly number the hit indicies
+              if(num_hits != as_signed(reads.size())){
+                  bam_aux_update_int(reads[i].get(), "NH", as_signed(reads.size()));
+                  bam_aux_update_int(reads[i].get(), "HI", as_signed(i+1));
+              }
+          }
         }
+        if(has_as){
+            auto as_tag = bam_aux_get(reads[i].get(), "AS");
+            if(as_tag){
+                auto score = bam_aux2i(as_tag);
+                if(second_best_as_i == -1 || score > second_best_as){
+                    second_best_as_i = as_signed(i);
+                    second_best_as = score;
+                    if(second_best_as > best_as){
+                        std::swap(best_as, second_best_as);
+                        std::swap(best_as_i, second_best_as_i);
+                    }
+                }
+            }
+        }
+
         auto qual = reads[i]->core.qual;
         if(qual > best_mapq){
             best_mapq = qual;
@@ -120,6 +150,20 @@ namespace fumi_tools {
               remove_flag(reads[i].get(), BAM_FSECONDARY);
           } else {
               add_flag(reads[i].get(), BAM_FSECONDARY);
+          }
+          if(has_as){
+              auto xs_tag = bam_aux_get(reads[i].get(), "XS");
+              if(xs_tag){
+                  if(second_best_as_i != -1){
+                      bam_aux_update_int(reads[i].get(), "XS", second_best_as);
+                  } else {
+                    // there is only one mapping left - so the XS = AS
+                    auto as_tag = bam_aux_get(reads[i].get(), "AS");
+                    if(as_tag){
+                      bam_aux_update_int(reads[i].get(), "XS", bam_aux2i(as_tag));
+                    }
+                  }
+              }
           }
           if(sam_write1(outfile, bam_hdr, reads[i].get()) < 0){
               std::cerr << "Failed to write to output file!" << std::endl;
