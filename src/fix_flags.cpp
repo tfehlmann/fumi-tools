@@ -187,7 +187,7 @@ namespace fumi_tools {
       bam1_t* record = bam_init1();
       while (sam_read1(infile, bam_hdr, record) > 0) {
         if ((record->core.flag & BAM_FUNMAP) == 0) {
-          auto qname = nonstd::string_view(bam_get_qname(record), record->core.l_qname);
+          auto qname = nonstd::string_view(bam_get_qname(record));
           if(qname != last_qname){
               // fix flags for this chunk of reads and output them
               fix_and_output_read_flags(reads, bam_hdr, outfile);

@@ -219,7 +219,7 @@ void process_bam_read_chunks(samFile* file, bam_hdr_t* bam_hdr, umi_opts opts,
     if ((record->core.flag & BAM_FUNMAP) == 0) {
       cur_ref = record->core.tid;
       auto* qname = bam_get_qname(record);
-      auto umi = get_umi(qname, record->core.l_qname);
+      auto umi = get_umi(qname, std::strlen(qname));
       uint64_t start = 0;
       uint64_t pos = 0;
       bool is_spliced = false;
