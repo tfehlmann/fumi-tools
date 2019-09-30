@@ -9,12 +9,11 @@
   }],
   ['@semantic-release/gitlab', {
     "gitlabUrl": "https://ccb-gitlab.cs.uni-saarland.de",
-    "assets": [{
-     "path": "dist/fumi_tools_*_static_linux_x86_64.tar.gz", "label": "Linux 64 bit binary",
-     "path": "dist/fumi_tools-*.tar.gz", "label": "Source code (/w dependencies)"
-    }]
-    }
-  ]
+    "assets": [
+     {"path": "dist/fumi_tools_*_static_linux_x86_64.tar.gz", "label": "Linux 64 bit binary"},
+     {"path": "dist/fumi_tools-*.tar.gz", "label": "Source code (/w dependencies)"}
+    ]
+  }]
 ],
 "tagFormat": "${version}"
 }

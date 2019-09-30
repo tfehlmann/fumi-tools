@@ -13,8 +13,9 @@ publish:
   stage: release
   script:
     - apt-get update && apt-get install -y cmake
-    - npm install @semantic-release/git
-    - npm install @semantic-release/gitlab
+    - npm install -g @semantic-release/git
+    - npm install -g @semantic-release/gitlab
+    - npm install -g @semantic-release/exec
     - npx semantic-release@15
   tags:
     - docker
