@@ -183,15 +183,16 @@ namespace fumi_tools {
 
       auto progress = cpg::cpg(prog_cfg);
 
-      auto last_qname = "";
+      std::string last_qname;
       bam1_t* record = bam_init1();
       while (sam_read1(infile, bam_hdr, record) > 0) {
         if ((record->core.flag & BAM_FUNMAP) == 0) {
-          auto* qname = bam_get_qname(record);
+          auto qname = nonstd::string_view(bam_get_qname(record), record->core.l_qname);
           if(qname != last_qname){
               // fix flags for this chunk of reads and output them
               fix_and_output_read_flags(reads, bam_hdr, outfile);
               reads.clear();
+              last_qname.assign(qname.begin(), qname.end());
           }
           reads.emplace_back(bam_dup1(record));
         }
