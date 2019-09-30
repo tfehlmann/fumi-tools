@@ -1,0 +1,12 @@
+stages:
+    - release
+
+publish:
+  image: node:12
+  stage: release
+  script:
+    - apt-get update && apt-get install cmake
+    - mkdir build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX=$PWD/../dist -DBUILD_SHARED_LIBS=OFF
+    - npm install @semantic-release/exec -D
+    - npm install @semantic-release/gitlab -D
+    - npx semantic-release@15

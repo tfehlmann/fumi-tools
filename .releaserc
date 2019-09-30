@@ -1,0 +1,14 @@
+{
+"branch": "master",
+"plugins": [
+  '@semantic-release/commit-analyzer', 
+  '@semantic-release/release-notes-generator',
+  '@semantic-release/git',
+  ['@semantic-release/gitlab', {
+    "gitlabUrl": "https://ccb-gitlab.cs.uni-saarland.de",
+    "assets": "dist/**"
+    }
+  ]
+],
+"tagFormat": "${version}"
+}
