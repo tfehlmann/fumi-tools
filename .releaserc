@@ -6,7 +6,7 @@
   '@semantic-release/git',
   ['@semantic-release/gitlab', {
     "gitlabUrl": "https://ccb-gitlab.cs.uni-saarland.de",
-    "assets": "dist/**"
+    "assets": "dist/fumi_tools_static_linux_x86_64.tar.gz"
     }
   ]
 ],
