@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 SOURCE_DIR=$(realpath "$1")
 VERSION="$2"
 

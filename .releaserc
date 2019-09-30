@@ -5,7 +5,7 @@
   '@semantic-release/release-notes-generator',
   '@semantic-release/git',
   ['@semantic-release/exec', {
-    "publishCmd": "./publish.sh"
+    "publishCmd": "./publish.sh . ${nextRelease.version}"
   }],
   ['@semantic-release/gitlab', {
     "gitlabUrl": "https://ccb-gitlab.cs.uni-saarland.de",
