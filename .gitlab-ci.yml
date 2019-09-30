@@ -14,7 +14,7 @@ publish:
   script:
     - apt-get update && apt-get install -y cmake
     - mkdir build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX=$PWD/../dist -DBUILD_SHARED_LIBS=OFF && make -j4 install && cd ..
-    - npm install @semantic-release/exec -D
+    - npm install @semantic-release/git -D
     - npm install @semantic-release/gitlab -D
     - npx semantic-release@15
   tags:
