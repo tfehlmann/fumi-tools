@@ -1,6 +1,13 @@
 stages:
     - release
 
+services:
+  - docker:dind
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
+
 publish:
   image: node:12
   stage: release
@@ -10,3 +17,5 @@ publish:
     - npm install @semantic-release/exec -D
     - npm install @semantic-release/gitlab -D
     - npx semantic-release@15
+  tags:
+    - docker
