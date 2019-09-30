@@ -48,7 +48,7 @@ uint32_t find_splice(uint32_t* cigar, unsigned int n_cigar, bool reverse) {
   // a soft clip at the end of the read is taken as splicing
   // where as a soft clip at the start is not.
   if ((cigar[cigar_start] & BAM_CIGAR_MASK) == BAM_CSOFT_CLIP) {
-    offset = cigar[cigar_start] & BAM_CIGAR_SHIFT;
+    offset = cigar[cigar_start] >> BAM_CIGAR_SHIFT;
     if (reverse) {
       --cigar_start;
     } else {
@@ -65,7 +65,7 @@ uint32_t find_splice(uint32_t* cigar, unsigned int n_cigar, bool reverse) {
       case BAM_CDEL:
       case BAM_CEQUAL:
       case BAM_CDIFF:
-        offset += cigar[cigar_start] & BAM_CIGAR_SHIFT;
+        offset += cigar[cigar_start] >> BAM_CIGAR_SHIFT;
         break;
     }
   }
@@ -86,7 +86,7 @@ std::tuple<uint64_t, uint64_t, bool> get_read_position(
   auto is_spliced = false;
   auto* cigar = bam_get_cigar(read);
   auto n_cigar = read->core.n_cigar;
-  if ((read->core.flag & BAM_FUNMAP) != 0) {
+  if ((read->core.flag & BAM_FREVERSE) != 0) {
     auto pos = bam_endpos(read);
     if ((cigar[n_cigar - 1] & BAM_CIGAR_MASK) == BAM_CSOFT_CLIP) {
       auto count = cigar[n_cigar - 1] >> BAM_CIGAR_SHIFT;
@@ -95,19 +95,19 @@ std::tuple<uint64_t, uint64_t, bool> get_read_position(
     auto start = read->core.pos;
     if (cigar_has_cref_skip(cigar, n_cigar) ||
         ((cigar[0] & BAM_CIGAR_MASK) == BAM_CSOFT_CLIP &&
-         (cigar[0] & BAM_CIGAR_SHIFT) > soft_clip_threshold)) {
+         (cigar[0] >> BAM_CIGAR_SHIFT) > soft_clip_threshold)) {
       is_spliced = find_splice(cigar, n_cigar, true);
     }
     return std::tie(start, pos, is_spliced);
   } else {
     auto pos = read->core.pos;
     if ((cigar[0] & BAM_CIGAR_MASK) == BAM_CSOFT_CLIP) {
-      pos -= cigar[0] & BAM_CIGAR_SHIFT;
+      pos -= cigar[0] >> BAM_CIGAR_SHIFT;
     }
     auto start = pos;
     if (cigar_has_cref_skip(cigar, n_cigar) ||
         ((cigar[n_cigar - 1] & BAM_CIGAR_MASK) == BAM_CSOFT_CLIP &&
-         (cigar[n_cigar - 1] & BAM_CIGAR_SHIFT) > soft_clip_threshold)) {
+         (cigar[n_cigar - 1] >> BAM_CIGAR_SHIFT) > soft_clip_threshold)) {
       is_spliced = find_splice(cigar, n_cigar, false);
     }
     return std::tie(start, pos, is_spliced);
