@@ -1,5 +1,5 @@
 set(name "cppformat")
-set(url "https://github.com/fmtlib/fmt/releases/download/5.3.0/fmt-5.3.0.zip")
+set(url "https://github.com/fmtlib/fmt/releases/download/6.0.0/fmt-6.0.0.zip")
 set(dl "${CMAKE_CURRENT_BINARY_DIR}/${name}-dl")
 set(src "${CMAKE_CURRENT_BINARY_DIR}/${name}-src")
 set(build "${CMAKE_CURRENT_BINARY_DIR}/${name}")

@@ -11,7 +11,7 @@
 
 #include <fmt/format.h>
 
-#include <gitversion/version.h>
+#include <fumi_tools/version.hpp>
 
 #include <fumi_tools/cast_helper.hpp>
 #include <fumi_tools/helper.hpp>

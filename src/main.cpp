@@ -6,7 +6,7 @@
 
 #include <fmt/format.h>
 
-#include <gitversion/version.h>
+#include <fumi_tools/version.hpp>
 
 #include <fumi_tools/umi_opts.hpp>
 #include <fumi_tools/dedup.hpp>

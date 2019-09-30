@@ -4,9 +4,15 @@
   '@semantic-release/commit-analyzer', 
   '@semantic-release/release-notes-generator',
   '@semantic-release/git',
+  ['@semantic-release/exec', {
+    "publishCmd": "./publish.sh"
+  }],
   ['@semantic-release/gitlab', {
     "gitlabUrl": "https://ccb-gitlab.cs.uni-saarland.de",
-    "assets": "dist/fumi_tools_static_linux_x86_64.tar.gz"
+    "assets": [{
+     "path": "dist/fumi_tools_*_static_linux_x86_64.tar.gz", "label": "Linux 64 bit binary",
+     "path": "dist/fumi_tools-*.tar.gz", "label": "Source code (/w dependencies)"
+    }]
     }
   ]
 ],

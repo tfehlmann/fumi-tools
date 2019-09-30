@@ -1,5 +1,5 @@
 stages:
-    - release
+  - release
 
 services:
   - docker:dind
@@ -13,8 +13,6 @@ publish:
   stage: release
   script:
     - apt-get update && apt-get install -y cmake
-    - mkdir build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX=$PWD/../dist -DBUILD_SHARED_LIBS=OFF && make -j4 install && cd ..
-    - tar cfv dist/fumi_tools_static_linux_x86_64.tar.gz dist/bin
     - npm install @semantic-release/git
     - npm install @semantic-release/gitlab
     - npx semantic-release@15

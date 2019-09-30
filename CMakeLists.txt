@@ -24,7 +24,7 @@ if(NOT ${BUILD_SHARED_LIBS})
   # prefer static libraries
   if(WIN32)
     set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
-  ELSE(WIN32)
+  else(WIN32)
     set(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
   endif(WIN32)
 endif()
@@ -55,7 +55,18 @@ include("${PROJECT_SOURCE_DIR}/CMake/CMakeUtils.cmake")
 # include compiler specific additional flags (e.g. {GCC,CLANG,MSVC}_CXX_FLAGS_{DEBUG,RELWITHDEBINFO,RELEASE})
 include("${PROJECT_SOURCE_DIR}/CMake/GlobalCompilerFlags.cmake")
 
-include("${PROJECT_SOURCE_DIR}/CMake/gitversion/cmake.cmake")
+set(PRE_CONFIGURE_FILE "${PROJECT_SOURCE_DIR}/include/fumi_tools/version.hpp.in")
+set(POST_CONFIGURE_FILE "${PROJECT_SOURCE_DIR}/include/fumi_tools/version.hpp")
+set(VERSION_TAG_PREFIX_REGEX "")
+
+if (EXISTS "${PROJECT_SOURCE_DIR}/.git")
+    include("${PROJECT_SOURCE_DIR}/CMake/git_watcher.cmake")
+elseif(NOT EXISTS "${PROJECT_SOURCE_DIR}/include/fumi_tools/version.hpp")
+    message(FATAL_ERROR "The source directory is not a git repository and does not contain a version.hpp file!")
+endif()
+
+
+#include("${PROJECT_SOURCE_DIR}/CMake/gitversion/cmake.cmake")
 
 include(ExternalProject)
 include("${PROJECT_SOURCE_DIR}/CMake/ExternalZLib.cmake")
@@ -142,15 +153,21 @@ endif()
 
 add_library(${PROJECT_NAME} STATIC ${SOURCE_FILES} ${HEADER_FILES})
 
-add_executable(${PROJECT_NAME}-bin ${MAIN_FILE})
-add_executable(${PROJECT_NAME}-fix-flags-bin src/fix_flags.cpp)
+add_executable(${PROJECT_NAME}-bin ${POST_CONFIGURE_FILE} ${MAIN_FILE})
+add_executable(${PROJECT_NAME}-fix-flags-bin ${POST_CONFIGURE_FILE} src/fix_flags.cpp)
+
+if (EXISTS "${PROJECT_SOURCE_DIR}/.git")
+    add_dependencies(${PROJECT_NAME}-bin check_git_repository)
+    add_dependencies(${PROJECT_NAME}-fix-flags-bin check_git_repository)
+endif()
+
 set_target_properties(${PROJECT_NAME}-bin
   PROPERTIES OUTPUT_NAME ${PROJECT_NAME}_dedup)
-target_git_version_init(${PROJECT_NAME}-bin)
+#target_git_version_init(${PROJECT_NAME}-bin)
 
 set_target_properties(${PROJECT_NAME}-fix-flags-bin
   PROPERTIES OUTPUT_NAME ${PROJECT_NAME}_fix_flags)
-target_git_version_init(${PROJECT_NAME}-fix-flags-bin)
+#target_git_version_init(${PROJECT_NAME}-fix-flags-bin)
 
 add_dependencies(${PROJECT_NAME} ${cppformat_LIBRARY} ${ZLib_cf_LIBRARY} ${htslib_LIBRARY})
 
