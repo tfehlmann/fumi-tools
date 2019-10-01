@@ -3,6 +3,7 @@
 import argparse
 import subprocess
 import sys
+from os.path import join, realpath, exists, dirname
 
 def ext_check(*args):
     def extension(filename):
@@ -18,6 +19,11 @@ def mem_check(mem):
     mult = {"G": 1e6, "M": 1e3, "K": 1}
     return int(mem[:-1]) * mult[mem[-1]]
 
+script_path = realpath(dirname(__file__))
+
+fumi_dedup = join(script_path, "fumi_tools_dedup") if exists(join(script_path, "fumi_tools_dedup")) else "fumi_tools_dedup"
+fumi_fix = join(script_path, "fumi_tools_fix_flags") if exists(join(script_path, "fumi_tools_fix_flags")) else "fumi_tools_fix_flags"
+
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("-i", "--input", help="Input SAM or BAM file. Needs to be coordinate sorted.", required=True, type=ext_check(".bam", ".sam", "-"), default=argparse.SUPPRESS)
 parser.add_argument("-o", "--output", help="Output SAM or BAM file, sorted by read name. To output SAM on stdout use '-'.", required=True, type=ext_check(".bam", ".sam", "-"), default=argparse.SUPPRESS)
@@ -25,7 +31,7 @@ parser.add_argument("--start-only", help="Reads only need the same start positio
 parser.add_argument("--threads", help="Number of threads to use.", default=1, type=int)
 parser.add_argument("--memory", help="Maximum memory used for sorting. Units can be K/M/G.", default="3G", type=mem_check)
 parser.add_argument("--seed", help="Random number generator seed.", default=42, type=int)
-parser.add_argument("--version", help="Display version number.", action='version', version=subprocess.check_output(["fumi_tools_dedup", "--version"]).decode())
+parser.add_argument("--version", help="Display version number.", action='version', version=subprocess.check_output([fumi_dedup, "--version"]).decode())
 
 args = parser.parse_args()
 
@@ -33,17 +39,17 @@ ithreads = str(min(2, args.threads))
 sort_threads = args.threads
 memory_per_thread = str(int(args.memory / args.threads)) + "K"
 
-dedup_process = subprocess.Popen(["fumi_tools_dedup", "--input", args.input,
-                                                      "--output=-",
-                                                      "--start-only" if args.start_only else "",
-                                                      "--seed", str(args.seed),
-                                                      "--uncompressed",
-                                                      "--input-threads", ithreads], stdout=subprocess.PIPE)
+dedup_process = subprocess.Popen([fumi_dedup, "--input", args.input,
+                                              "--output=-",
+                                              "--start-only" if args.start_only else "",
+                                              "--seed", str(args.seed),
+                                              "--uncompressed",
+                                              "--input-threads", ithreads], stdout=subprocess.PIPE)
 sort_process = subprocess.Popen(["samtools", "sort", "-n", "-l0", "-@", str(sort_threads), "-m", memory_per_thread], stdin=dedup_process.stdout, stdout=subprocess.PIPE)
-fix_process = subprocess.Popen(["fumi_tools_fix_flags", "--input=-",
-                                                        "--output", args.output,
-                                                        "--input-threads", ithreads,
-                                                        "--output-threads", str(args.threads)], stdin=sort_process.stdout)
+fix_process = subprocess.Popen([fumi_fix, "--input=-",
+                                          "--output", args.output,
+                                          "--input-threads", ithreads,
+                                          "--output-threads", str(args.threads)], stdin=sort_process.stdout)
 dedup_process.stdout.close()
 sort_process.stdout.close()
 output = fix_process.communicate()[0]

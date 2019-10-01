@@ -62,7 +62,7 @@ set(VERSION_TAG_PREFIX_REGEX "")
 if (EXISTS "${PROJECT_SOURCE_DIR}/.git")
     include("${PROJECT_SOURCE_DIR}/CMake/git_watcher.cmake")
 elseif(NOT EXISTS "${PROJECT_SOURCE_DIR}/include/fumi_tools/version.hpp")
-    message(FATAL_ERROR "The source directory is not a git repository and does not contain a version.hpp file!")
+    message(FATAL_ERROR "The source directory is not a git repository and does not contain a version.hpp file! You have probably downloaded the source code without dependencies. Please download the source code bundled with dependencies.")
 endif()
 
 
