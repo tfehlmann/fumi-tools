@@ -15,7 +15,8 @@ publish:
     - apt-get update && apt-get install -y cmake
     - npm install -g semantic-release@15
     - npm install -g @semantic-release/git
-    - npm install -g @semantic-release/gitlab
+#    - npm install -g @semantic-release/gitlab
+    - npm install -g https://github.com/rdaniels6813/gitlab
     - npm install -g @semantic-release/exec
     - semantic-release
   tags:
