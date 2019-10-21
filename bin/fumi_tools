@@ -1,9 +1,14 @@
 #!/usr/bin/env python
 
 import argparse
+import signal
 import subprocess
 import sys
+
+from distutils.spawn import find_executable
 from os.path import join, realpath, exists, dirname
+from os import remove
+
 
 def ext_check(*args):
     def extension(filename):
@@ -23,42 +28,160 @@ script_path = realpath(dirname(__file__))
 
 fumi_dedup = join(script_path, "fumi_tools_dedup") if exists(join(script_path, "fumi_tools_dedup")) else "fumi_tools_dedup"
 fumi_fix = join(script_path, "fumi_tools_fix_flags") if exists(join(script_path, "fumi_tools_fix_flags")) else "fumi_tools_fix_flags"
+fumi_copy_umi = join(script_path, "fumi_tools_copy_umi") if exists(join(script_path, "fumi_tools_copy_umi")) else "fumi_tools_copy_umi"
 
-parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("-i", "--input", help="Input SAM or BAM file. Needs to be coordinate sorted.", required=True, type=ext_check(".bam", ".sam", "-"), default=argparse.SUPPRESS)
-parser.add_argument("-o", "--output", help="Output SAM or BAM file, sorted by read name. To output SAM on stdout use '-'.", required=True, type=ext_check(".bam", ".sam", "-"), default=argparse.SUPPRESS)
-parser.add_argument("--start-only", help="Reads only need the same start position and the same UMI to be considered duplicates.", action='store_true')
-parser.add_argument("--threads", help="Number of threads to use.", default=1, type=int)
-parser.add_argument("--memory", help="Maximum memory used for sorting. Units can be K/M/G.", default="3G", type=mem_check)
-parser.add_argument("--seed", help="Random number generator seed.", default=42, type=int)
-parser.add_argument("--version", help="Display version number.", action='version', version=subprocess.check_output([fumi_dedup, "--version"]).decode())
+if find_executable(fumi_dedup) is None or find_executable(fumi_fix) is None or find_executable(fumi_copy_umi) is None:
+    print("It seems that your installation is broken. Please reinstall the tool.")
+    sys.exit(1)
 
-args = parser.parse_args()
 
-ithreads = str(min(2, args.threads))
-sort_threads = args.threads
-memory_per_thread = str(int(args.memory / args.threads)) + "K"
+VERSION = subprocess.check_output([fumi_dedup, "--version"]).decode()
+VERSION_NUMBER = VERSION[VERSION.find(' ')+1:]
 
-dedup_process = subprocess.Popen([fumi_dedup, "--input", args.input,
-                                              "--output=-",
-                                              "--start-only" if args.start_only else "",
-                                              "--seed", str(args.seed),
-                                              "--uncompressed",
-                                              "--input-threads", ithreads], stdout=subprocess.PIPE)
-sort_process = subprocess.Popen(["samtools", "sort", "-n", "-l0", "-@", str(sort_threads), "-m", memory_per_thread], stdin=dedup_process.stdout, stdout=subprocess.PIPE)
-fix_process = subprocess.Popen([fumi_fix, "--input=-",
-                                          "--output", args.output,
-                                          "--input-threads", ithreads,
-                                          "--output-threads", str(args.threads)], stdin=sort_process.stdout)
-dedup_process.stdout.close()
-sort_process.stdout.close()
-output = fix_process.communicate()[0]
+class fumi_tools(object):
+    def __init__(self):
+        parser = argparse.ArgumentParser(
+            usage="""fumi_tools <command> [<args>]
+Version: {}
 
-if dedup_process.returncode != 0:
-    sys.exit(dedup_process.returncode)
-if sort_process.returncode != 0:
-    sys.exit(sort_process.returncode)
-if fix_process.returncode != 0:
-    sys.exit(fix_process.returncode)
+Available commands are:
+    copy_umi  Copy UMI from FASTQ files into their header
+    dedup     Deduplicate reads in BAM files
+""".format(VERSION_NUMBER))
+        parser.add_argument("command", help="Subcommand to run")
+        args = parser.parse_args(sys.argv[1:2])
+        if not hasattr(self, args.command):
+            print("Unrecognized command: " + sys.argv[1] + "\n")
+            parser.print_help()
+            sys.exit(1)
+        getattr(self, args.command)()
+        self.command = args.command
 
-sys.exit(0)
+    def copy_umi(self):
+        parser = argparse.ArgumentParser(prog="fumi_tools copy_umi", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        parser.add_argument("-i", "--input", help="Input FASTQ file, optionally gzip compressed.", required=True, type=ext_check(".fastq", ".fq", ".fastq.gz", ".fq.gz"), default=argparse.SUPPRESS)
+        parser.add_argument("-o", "--output", help="Output FASTQ file, optionally gzip compressed.", required=True, type=ext_check(".fastq", ".fq", ".fastq.gz", ".fq.gz"), default=argparse.SUPPRESS)
+        parser.add_argument("--umi-length", help="Length of the UMI to copy. It is assumed that the UMI starts at the 5' end of the read.", type=int, required=True)
+        parser.add_argument("--threads", help="Number of threads to use.", default=1, type=int)
+        parser.add_argument("--version", help="Display version number.", action='version', version=VERSION)
+        self.c_args = parser.parse_args(sys.argv[2:])
+
+    def dedup(self):
+        parser = argparse.ArgumentParser(prog="fumi_tools dedup", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        parser.add_argument("-i", "--input", help="Input SAM or BAM file. Needs to be coordinate sorted.", required=True, type=ext_check(".bam", ".sam", "-"), default=argparse.SUPPRESS)
+        parser.add_argument("-o", "--output", help="Output SAM or BAM file, sorted by read name. To output SAM on stdout use '-'.", required=True, type=ext_check(".bam", ".sam", "-"), default=argparse.SUPPRESS)
+        parser.add_argument("--start-only", help="Reads only need the same start position and the same UMI to be considered duplicates.", action='store_true')
+        parser.add_argument("--threads", help="Number of threads to use.", default=1, type=int)
+        parser.add_argument("--memory", help="Maximum memory used for sorting. Units can be K/M/G.", default="3G", type=mem_check)
+        parser.add_argument("--seed", help="Random number generator seed.", default=42, type=int)
+        parser.add_argument("--version", help="Display version number.", action='version', version=VERSION)
+        self.c_args = parser.parse_args(sys.argv[2:])
+
+
+def copy_umi(args):
+    in_gz = args.input.endswith(".gz")
+    out_gz = args.output.endswith(".gz")
+
+    out_f = open(args.output, 'wb')
+    if in_gz:
+        unzip = subprocess.Popen(["gzip", "-cd", args.input], stdout=subprocess.PIPE)
+        copy = subprocess.Popen([fumi_copy_umi, str(args.umi_length)], stdin=unzip.stdout, stdout=subprocess.PIPE if out_gz else out_f)
+    else:
+        in_f = open(args.input, 'rb')
+        copy = subprocess.Popen([fumi_copy_umi, str(args.umi_length)], stdin=in_f, stdout=subprocess.PIPE if out_gz else out_f)
+    if out_gz:
+        if args.threads > 3 and find_executable("pigz") is not None:
+            compress = subprocess.Popen(["pigz", "-p", str(args.threads - 2)], stdin=copy.stdout, stdout=out_f)
+        else:
+            compress = subprocess.Popen(["gzip"], stdin=copy.stdout, stdout=out_f)
+    if in_gz:
+        unzip.stdout.close()
+    if out_gz:
+        copy.stdout.close()
+        output = compress.communicate()[0]
+    else:
+        output = copy.communicate()[0]
+    if not in_gz:
+        in_f.close()
+    out_f.close()
+
+    if out_gz and compress.poll() != 0:
+        print("Compressing output to file '{}' failed!".format(args.output), file=sys.stderr)
+        if exists(args.output):
+            remove(args.output)
+        return compress.returncode
+    if copy.poll() != 0:
+        print("Extracting UMI failed!", file=sys.stderr)
+        if exists(args.output):
+            remove(args.output)
+        return copy.returncode
+    if in_gz and unzip.poll() != 0:
+        print("Decompressing file '{}' failed!".format(args.input), file=sys.stderr)
+        if exists(args.output):
+            remove(args.output)
+        return unzip.returncode
+
+    return 0
+
+        
+
+def dedup(args):
+    ithreads = str(min(2, args.threads))
+    sort_threads = args.threads
+    memory_per_thread = str(int(args.memory / args.threads)) + "K"
+
+    dedup_process = subprocess.Popen([fumi_dedup, "--input", args.input,
+                                                "--output=-",
+                                                "--start-only" if args.start_only else "",
+                                                "--seed", str(args.seed),
+                                                "--uncompressed",
+                                                "--input-threads", ithreads], stdout=subprocess.PIPE)
+    sort_process = subprocess.Popen(["samtools", "sort", "-n", "-l0", "-@", str(sort_threads), "-m", memory_per_thread], stdin=dedup_process.stdout, stdout=subprocess.PIPE)
+    fix_process = subprocess.Popen([fumi_fix, "--input=-",
+                                            "--output", args.output,
+                                            "--input-threads", ithreads,
+                                            "--output-threads", str(args.threads)], stdin=sort_process.stdout)
+    dedup_process.stdout.close()
+    sort_process.stdout.close()
+    output = fix_process.communicate()[0]
+
+    if fix_process.poll() != 0:
+        print("Fixing flags for file '{}' failed!".format(args.output), file=sys.stderr)
+        # if there is a failure here need to send a signal to both other processes
+        sort_process.send_signal(signal.SIGTERM)
+        dedup_process.send_signal(signal.SIGTERM)
+        if exists(args.output):
+            remove(args.output)
+        return fix_process.returncode
+    # no need to send signals to the other processes here
+    if sort_process.poll() != 0:
+        print("Sorting deduplicated file failed!", file=sys.stderr)
+        if exists(args.output):
+            remove(args.output)
+        return sort_process.returncode
+    if dedup_process.poll() != 0:
+        print("Deduplicating file '{}' failed".format(args.input), file=sys.stderr)
+        if exists(args.output):
+            remove(args.output)
+        return dedup_process.returncode
+
+    return 0
+
+
+# remove output file if we interrupt or kill this process
+def handle_signal(args):
+    def _(sig, frame):
+        if exists(args.output):
+            remove(args.output)
+    return _
+
+if __name__ == '__main__':
+    args = fumi_tools()
+
+    signal.signal(signal.SIGINT, handle_signal(args.c_args))
+    signal.signal(signal.SIGTERM, handle_signal(args.c_args))
+
+    if args.command == "copy_umi":
+        sys.exit(copy_umi(args.c_args))
+    elif args.command == "dedup":
+        sys.exit(dedup(args.c_args))
