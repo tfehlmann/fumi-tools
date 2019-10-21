@@ -1,4 +1,4 @@
-[![pipeline status](https://ccb-gitlab.cs.uni-saarland.de/tobias/fumi_tools/badges/master/pipeline.svg)](https://ccb-gitlab.cs.uni-saarland.de/tobias/fumi_tools/commits/master) [![Anaconda-Server Badge](https://anaconda.org/ccb-sb/fumi_tools/badges/platforms.svg)](https://anaconda.org/ccb-sb/fumi_tools) [![Anaconda-Server Badge](https://anaconda.org/ccb-sb/fumi_tools/badges/version.svg)](https://anaconda.org/ccb-sb/fumi_tools) 
+[![pipeline status](https://ccb-gitlab.cs.uni-saarland.de/tobias/fumi_tools/badges/master/pipeline.svg)](https://ccb-gitlab.cs.uni-saarland.de/tobias/fumi_tools/commits/master) [![Anaconda-Server Badge](https://anaconda.org/ccb-sb/fumi_tools/badges/platforms.svg)](https://anaconda.org/ccb-sb/fumi_tools) [![Anaconda-Server Badge](https://anaconda.org/ccb-sb/fumi_tools/badges/version.svg)](https://anaconda.org/ccb-sb/fumi_tools) [![Commitizen friendly](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](http://commitizen.github.io/cz-cli/)
 
 
 # fumi-tools
