@@ -1,3 +1,6 @@
+[![pipeline status](https://ccb-gitlab.cs.uni-saarland.de/tobias/fumi_tools/badges/master/pipeline.svg)](https://ccb-gitlab.cs.uni-saarland.de/tobias/fumi_tools/commits/master) [![Anaconda-Server Badge](https://anaconda.org/ccb-sb/fumi_tools/badges/platforms.svg)](https://anaconda.org/ccb-sb/fumi_tools) [![Anaconda-Server Badge](https://anaconda.org/ccb-sb/fumi_tools/badges/version.svg)](https://anaconda.org/ccb-sb/fumi_tools) 
+
+
 # fumi-tools
 
 This tool is intended to deduplicate UMIs from single-end sequencing data. Reads are considered identical when their UMIs have the same sequence, they have the same length and map at the same position.
@@ -10,7 +13,7 @@ This code was tested on Ubuntu 16.04, 17.10, 18.04 and Arch Linux with GCC 5, 6,
 
 Download the latest binaries from the [release page](https://ccb-gitlab.cs.uni-saarland.de/tobias/fumi_tools/releases). These are self-contained and should work on any 64-bit Linux system.
 
-### Conda
+### Conda [![Anaconda-Server Badge](https://anaconda.org/ccb-sb/fumi_tools/badges/installer/conda.svg)](https://conda.anaconda.org/ccb-sb)
 
 Binaries are also available on our conda channel and can be installed with the following command:
 
