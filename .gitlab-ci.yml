@@ -32,6 +32,8 @@ conda:
     - anaconda login --hostname CI --username $ANACONDA_USER --password $ANACONDA_PASSWORD
     - conda config --set anaconda_upload yes
     - conda build --override-channels -c conda-forge -c bioconda -c defaults conda-recipe
+  after_script:
+    - anaconda logout
   tags:
     - docker
   only:
