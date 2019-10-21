@@ -21,6 +21,8 @@ publish:
     - semantic-release
   tags:
     - docker
+  only:
+    - master
 
 conda:
   image: continuumio/miniconda
