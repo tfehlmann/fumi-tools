@@ -21,3 +21,16 @@ publish:
     - semantic-release
   tags:
     - docker
+
+conda:
+  image: continuumio/miniconda
+  stage: release
+  script:
+    - conda install conda-build anaconda-client
+    - anaconda login --hostname CI --username $ANACONDA_USER --password $ANACONDA_PASSWORD
+    - conda config --set anaconda_upload yes
+    - conda build --override-channels -c conda-forge -c bioconda -c defaults conda-recipe
+  tags:
+    - docker
+  only:
+    - tags

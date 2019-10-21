@@ -1,0 +1,28 @@
+package:
+  name: fumi_tools
+  version: {{ GIT_DESCRIBE_TAG }}
+
+source:
+  git_url: https://ccb-gitlab.cs.uni-saarland.de/tobias/fumi_tools.git
+  git_rev: {{ GIT_DESCRIBE_TAG }}
+
+build:
+  number: 0
+  ignore_run_exports:
+    - zlib
+
+requirements:
+  build:
+    - cmake
+    - {{ compiler('c') }}
+    - {{ compiler('cxx') }}
+  host:
+    - zlib
+
+about:
+  home: https://ccb-gitlab.cs.uni-saarland.de/tobias/fumi_tools
+  license: MIT
+  license_file: LICENSE
+  summary: |
+    Tool for deduplicating UMIs
+
