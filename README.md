@@ -13,7 +13,7 @@ This code was tested on Ubuntu 16.04, 17.10, 18.04 and Arch Linux with GCC 5, 6,
 
 Download the latest binaries from the [release page](https://ccb-gitlab.cs.uni-saarland.de/tobias/fumi_tools/releases). These are self-contained and should work on any 64-bit Linux system.
 
-### Conda [![Anaconda-Server Badge](https://anaconda.org/ccb-sb/fumi_tools/badges/installer/conda.svg)](https://conda.anaconda.org/ccb-sb)
+### Conda [![Anaconda-Server Badge](https://anaconda.org/ccb-sb/fumi_tools/badges/installer/conda.svg)](https://anaconda.org/ccb-sb/fumi_tools)
 
 Binaries are also available on our conda channel and can be installed with the following command:
 
