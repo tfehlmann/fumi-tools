@@ -38,6 +38,28 @@ cmake --build . --target install -- -j {number_of_threads_for_compilation}
 
 ```
 
+### Optional dependencies
+
+We optionally use [pigz](https://github.com/madler/pigz) to compress FASTQ files with multiple threads. This tool can usually be installed over the distribution package manager or as alternative over [conda](https://anaconda.org/anaconda/pigz).
+
+#### Ubuntu
+
+```bash
+sudo apt install pigz
+```
+
+#### Arch Linux
+
+```bash
+sudo pacman -S pigz
+```
+
+#### Conda
+
+```bash
+conda install pigz
+```
+
 
 
 ## Usage
@@ -67,7 +89,7 @@ optional arguments:
                         Output FASTQ file, optionally gzip compressed.
   --umi-length UMI_LENGTH
                         Length of the UMI to copy. It is assumed that the UMI
-                        starts at the 5' end of the read. (default: None)
+                        starts at the 5p end of the read. (default: None)
   --threads THREADS     Number of threads to use. (default: 1)
   --version             Display version number
 ```
