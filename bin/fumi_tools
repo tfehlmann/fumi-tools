@@ -106,17 +106,17 @@ def copy_umi(args):
         in_f.close()
     out_f.close()
 
-    if out_gz and compress.poll() != 0:
+    if out_gz and compress.wait() != 0:
         print("Compressing output to file '{}' failed!".format(args.output), file=sys.stderr)
         if exists(args.output):
             remove(args.output)
         return compress.returncode
-    if copy.poll() != 0:
+    if copy.wait() != 0:
         print("Extracting UMI failed!", file=sys.stderr)
         if exists(args.output):
             remove(args.output)
         return copy.returncode
-    if in_gz and unzip.poll() != 0:
+    if in_gz and unzip.wait() != 0:
         print("Decompressing file '{}' failed!".format(args.input), file=sys.stderr)
         if exists(args.output):
             remove(args.output)
@@ -146,7 +146,7 @@ def dedup(args):
     sort_process.stdout.close()
     output = fix_process.communicate()[0]
 
-    if fix_process.poll() != 0:
+    if fix_process.wait() != 0:
         print("Fixing flags for file '{}' failed!".format(args.output), file=sys.stderr)
         # if there is a failure here need to send a signal to both other processes
         sort_process.send_signal(signal.SIGTERM)
@@ -155,12 +155,12 @@ def dedup(args):
             remove(args.output)
         return fix_process.returncode
     # no need to send signals to the other processes here
-    if sort_process.poll() != 0:
+    if sort_process.wait() != 0:
         print("Sorting deduplicated file failed!", file=sys.stderr)
         if exists(args.output):
             remove(args.output)
         return sort_process.returncode
-    if dedup_process.poll() != 0:
+    if dedup_process.wait() != 0:
         print("Deduplicating file '{}' failed".format(args.input), file=sys.stderr)
         if exists(args.output):
             remove(args.output)
