@@ -2,14 +2,19 @@
 
 from __future__ import print_function
 import argparse
+import contextlib
 import signal
 import subprocess
 import sys
+import tempfile
+import uuid
+import math
+import os
 
 from distutils.spawn import find_executable
 from os.path import join, realpath, exists, dirname
-from os import remove
-
+from os import remove, mkfifo
+from shutil import rmtree
 
 def ext_check(*args):
     def extension(filename):
@@ -39,6 +44,29 @@ if find_executable(fumi_dedup) is None or find_executable(fumi_fix) is None or f
 VERSION = subprocess.check_output([fumi_dedup, "--version"]).decode()
 VERSION_NUMBER = VERSION[VERSION.find(' ')+1:]
 
+@contextlib.contextmanager
+def named_pipe(name):
+    dirname = tempfile.mkdtemp()
+    try:
+        path = join(dirname, name)
+        mkfifo(path)
+        yield path
+    finally:
+        rmtree(dirname)
+
+@contextlib.contextmanager
+def named_pipe_or_filename(name, filename, condition):
+    if condition:
+        dirname = tempfile.mkdtemp()
+        try:
+            path = join(dirname, name)
+            mkfifo(path)
+            yield path
+        finally:
+            rmtree(dirname)
+    else:
+        yield filename
+
 class fumi_tools(object):
     def __init__(self):
         parser = argparse.ArgumentParser(
@@ -61,7 +89,9 @@ Available commands are:
     def copy_umi(self):
         parser = argparse.ArgumentParser(prog="fumi_tools copy_umi", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         parser.add_argument("-i", "--input", help="Input FASTQ file, optionally gzip compressed.", required=True, type=ext_check(".fastq", ".fq", ".fastq.gz", ".fq.gz"), default=argparse.SUPPRESS)
+        parser.add_argument("--input-read2", help="Input paired end R2 FASTQ file, optionally gzip compressed.", required=False, type=ext_check(".fastq", ".fq", ".fastq.gz", ".fq.gz"), default=argparse.SUPPRESS)
         parser.add_argument("-o", "--output", help="Output FASTQ file, optionally gzip compressed.", required=True, type=ext_check(".fastq", ".fq", ".fastq.gz", ".fq.gz"), default=argparse.SUPPRESS)
+        parser.add_argument("--output-read2", help="Output paired end R2 FASTQ file, optionally gzip compressed.", required=False, type=ext_check(".fastq", ".fq", ".fastq.gz", ".fq.gz"), default=argparse.SUPPRESS)
         parser.add_argument("--umi-length", help="Length of the UMI to copy. It is assumed that the UMI starts at the 5' end of the read.", type=int, required=True)
         parser.add_argument("--threads", help="Number of threads to use.", default=1, type=int)
         parser.add_argument("--version", help="Display version number.", action='version', version=VERSION)
@@ -71,6 +101,7 @@ Available commands are:
         parser = argparse.ArgumentParser(prog="fumi_tools dedup", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         parser.add_argument("-i", "--input", help="Input SAM or BAM file. Needs to be coordinate sorted.", required=True, type=ext_check(".bam", ".sam", "-"), default=argparse.SUPPRESS)
         parser.add_argument("-o", "--output", help="Output SAM or BAM file, sorted by read name. To output SAM on stdout use '-'.", required=True, type=ext_check(".bam", ".sam", "-"), default=argparse.SUPPRESS)
+        parser.add_argument("--paired", help="Specify this option if your input contains paired end reads")
         parser.add_argument("--start-only", help="Reads only need the same start position and the same UMI to be considered duplicates.", action='store_true')
         parser.add_argument("--threads", help="Number of threads to use.", default=1, type=int)
         parser.add_argument("--memory", help="Maximum memory used for sorting. Units can be K/M/G.", default="3G", type=mem_check)
@@ -78,11 +109,105 @@ Available commands are:
         parser.add_argument("--version", help="Display version number.", action='version', version=VERSION)
         self.c_args = parser.parse_args(sys.argv[2:])
 
+def copy_umi_paired(args):
+    in_gz = args.input.endswith(".gz")
+    in2_gz = args.input_read2.endswith(".gz")
+    out_gz = args.output.endswith(".gz")
+    out2_gz = args.output_read2.endswith(".gz")
+    out_f = open(args.output, 'wb')
 
-def copy_umi(args):
+    @contextlib.contextmanager
+    def get_in2_read():
+        if in2_gz:
+            yield named_pipe('input_read2')
+        else:
+            yield args.input_read2
+
+    @contextlib.contextmanager
+    def get_out2_read():
+        if out2_gz:
+            yield named_pipe('output_read2')
+        else:
+            yield args.output_read2
+
+    with named_pipe_or_filename('input_read2', args.input_read2, in2_gz) as input_read2,\
+         named_pipe_or_filename('output_read2', args.output_read2, out2_gz) as output_read2:
+        if in_gz:
+            unzip1 = subprocess.Popen(["gzip", "-cd", args.input], stdout=subprocess.PIPE)
+            read1_strm = unzip1.stdout
+        else:
+            read1_strm = open(args.input, 'rb')
+
+        copy = subprocess.Popen([fumi_copy_umi, str(args.umi_length), input_read2, output_read2], stdin=read1_strm, stdout=subprocess.PIPE if out_gz else out_f)
+
+        if in2_gz:
+            read2_strm = os.open(input_read2, os.O_WRONLY)
+            unzip2 = subprocess.Popen(["gzip", "-cd", args.input_read2], stdout=read2_strm)
+
+        if out_gz:
+            c1_threads = math.ceil((args.threads - 2) / 2)
+            if c1_threads > 1 and find_executable("pigz") is not None:
+                compress = subprocess.Popen(["pigz", "-p", str(c1_threads)], stdin=copy.stdout, stdout=out_f)
+            else:
+                compress = subprocess.Popen(["gzip"], stdin=copy.stdout, stdout=out_f)
+        if out2_gz:
+            out2_strm = os.open(output_read2, os.O_RDONLY | os.O_NONBLOCK)
+            out_f2 = open(args.output_read2, 'wb')
+            c2_threads = math.floor((args.threads - 2) / 2)
+            if c2_threads > 1 and find_executable("pigz") is not None:
+                compress2 = subprocess.Popen(["pigz", "-c", "-p", str(c2_threads), output_read2], stdout=out_f2)
+            else:
+                compress2 = subprocess.Popen(["gzip", "-c", output_read2], stdout=out_f2)
+
+        read1_strm.close()
+        if out_gz:
+            copy.stdout.close()
+            output = compress.communicate()[0]
+        if out2_gz:
+            if in2_gz:
+                os.close(read2_strm)
+            copy.stdout.close()
+            os.close(out2_strm)
+            output2 = compress2.communicate()[0]
+        if not out_gz and not out2_gz:
+            output = copy.communicate()[0]
+        out_f.close()
+
+        def cleanup_handles(clean_files):
+            if clean_files:
+                if exists(args.output):
+                    remove(args.output)
+                if exists(args.output_read2):
+                    remove(args.output_read2)
+                out_f2.close()
+
+        if out_gz and compress.wait() != 0:
+            print("Compressing output to file '{}' failed!".format(args.output), file=sys.stderr)
+            cleanup_handles(True)
+            return compress.returncode
+        if out2_gz and compress2.wait() != 0:
+            print("Compressing output to file '{}' failed!".format(args.output_read2), file=sys.stderr)
+            cleanup_handles(True)
+            return compress2.returncode
+        if copy.wait() != 0:
+            print("Extracting UMI failed!", file=sys.stderr)
+            cleanup_handles(True)
+            return copy.returncode
+        if in_gz and unzip1.wait() != 0:
+            print("Decompressing file '{}' failed!".format(args.input), file=sys.stderr)
+            cleanup_handles(True)
+            return unzip1.returncode
+        if in2_gz and unzip2.wait() != 0:
+            print("Decompressing file '{}' failed!".format(args.input_read2), file=sys.stderr)
+            cleanup_handles(True)
+            return unzip2.returncode
+        cleanup_handles(False)
+        return 0
+
+
+def copy_umi_single(args):
     in_gz = args.input.endswith(".gz")
     out_gz = args.output.endswith(".gz")
-
     out_f = open(args.output, 'wb')
     if in_gz:
         unzip = subprocess.Popen(["gzip", "-cd", args.input], stdout=subprocess.PIPE)
@@ -124,6 +249,12 @@ def copy_umi(args):
 
     return 0
 
+
+def copy_umi(args):
+    if hasattr(args, 'input_read2'):
+        return copy_umi_paired(args)
+    else:
+        return copy_umi_single(args)
         
 
 def dedup(args):

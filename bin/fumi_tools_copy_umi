@@ -4,12 +4,32 @@ import sys
 
 umi_len = int(sys.argv[1])
 
-for i, l in enumerate(sys.stdin):
-    if i % 4 == 0:
-        pos = l.find(' ')
-        new_header = "{}_{{}}{}".format(l[:pos], l[pos:])
-    elif i %4 == 1:
-        sys.stdout.write(new_header.format(l[:umi_len]))
-        sys.stdout.write(l)
-    else:
-        sys.stdout.write(l)
+paired_end = len(sys.argv) == 4
+
+if not paired_end:
+    for i, l in enumerate(sys.stdin):
+        if i % 4 == 0:
+            pos = l.find(' ')
+            new_header = "{}_{{}}{}".format(l[:pos], l[pos:])
+        elif i %4 == 1:
+            sys.stdout.write(new_header.format(l[:umi_len]))
+            sys.stdout.write(l)
+        else:
+            sys.stdout.write(l)
+
+else:
+    with open(sys.argv[2], 'r') as in2, open(sys.argv[3], 'w') as out2:
+        for i, (l1, l2) in enumerate(zip(sys.stdin, in2)):
+            if i % 4 == 0:
+                pos1 = l1.find(' ')
+                new_header_1 = "{}_{{}}{}".format(l1[:pos1], l1[pos1:])
+                pos2 = l2.find(' ')
+                new_header_2 = "{}_{{}}{}".format(l2[:pos2], l2[pos2:])
+            elif i % 4 == 1:
+                sys.stdout.write(new_header_1.format(l1[:umi_len]))
+                out2.write(new_header_2.format(l1[:umi_len]))
+                sys.stdout.write(l1)
+                out2.write(l2)
+            else:
+                sys.stdout.write(l1)
+                out2.write(l1)
