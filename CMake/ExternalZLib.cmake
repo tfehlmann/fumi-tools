@@ -1,5 +1,5 @@
 set(name "ZLib_cf")
-set(url "https://github.com/cloudflare/zlib/archive/gcc.amd64.zip")
+set(url "https://github.com/cloudflare/zlib/archive/372bcd151c901418c2721232bf09dc9cdbebafb5.zip")
 set(fname "ZLib_cf.zip")
 set(dl "${CMAKE_CURRENT_BINARY_DIR}/${name}-dl")
 set(src "${CMAKE_CURRENT_BINARY_DIR}/${name}-src")
@@ -34,7 +34,7 @@ ExternalProject_Add(
   BINARY_DIR ${build}
   INSTALL_DIR ${install}
   BUILD_COMMAND ""
-  PATCH_COMMAND patch -t -N ${src}/CMakeLists.txt ${PROJECT_SOURCE_DIR}/CMake/ZLibCMakeLists.patch
+  PATCH_COMMAND ""
   CMAKE_ARGS
   "-G${CMAKE_GENERATOR}"
   "-DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>"
