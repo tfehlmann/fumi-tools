@@ -106,7 +106,7 @@ set(ZLIB_FOUND True)
 if(__COMPILER_GNU AND NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") # GCC, MINGW
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -pthread")
         set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${GCC_CXX_FLAGS_DEBUG}")
-        set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -pipe -march=native -fsanitize=address")
+        set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -pipe -march=native")
         if(${BUILD_GENERIC})
                 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -pipe -march=x86-64 -mtune=generic -msse4.2")
         else()
@@ -115,7 +115,6 @@ if(__COMPILER_GNU AND NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") # GCC, MI
 
         if(NOT ${BUILD_SHARED_LIBS})
           set(CMAKE_EXE_LINKER_FLAGS "-static")
-          set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "-static-libasan")
         endif()
         # needed for std::to_string
         if(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
