@@ -16,6 +16,11 @@ struct umi_opts {
   bool uncompressed = false;
   uint64_t ithreads = 1;
   uint64_t othreads = 1;
+  bool paired = false;
+  bool ignore_tlen = false;
+  std::string unpaired_reads = "use";
+  std::string chimeric_pairs = "use";
+  std::string unmapped_reads = "discard";
 };
 
 }  // namespace fumi_tools

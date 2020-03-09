@@ -20,7 +20,7 @@ class umi_clusterer {
 
   template <class Fun>
   void operator()(
-      const robin_hood::unordered_flat_map<
+      robin_hood::unordered_flat_map<
           std::string, std::pair<std::unique_ptr<bam1_t, bam1_t_deleter>, uint64_t>>&
           bundle,
           Fun fun) {

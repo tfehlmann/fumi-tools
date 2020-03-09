@@ -101,7 +101,7 @@ Available commands are:
         parser = argparse.ArgumentParser(prog="fumi_tools dedup", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         parser.add_argument("-i", "--input", help="Input SAM or BAM file. Needs to be coordinate sorted.", required=True, type=ext_check(".bam", ".sam", "-"), default=argparse.SUPPRESS)
         parser.add_argument("-o", "--output", help="Output SAM or BAM file, sorted by read name. To output SAM on stdout use '-'.", required=True, type=ext_check(".bam", ".sam", "-"), default=argparse.SUPPRESS)
-        parser.add_argument("--paired", help="Specify this option if your input contains paired end reads")
+        parser.add_argument("--paired", help="Specify this option if your input contains paired end reads", action='store_true')
         parser.add_argument("--start-only", help="Reads only need the same start position and the same UMI to be considered duplicates.", action='store_true')
         parser.add_argument("--threads", help="Number of threads to use.", default=1, type=int)
         parser.add_argument("--memory", help="Maximum memory used for sorting. Units can be K/M/G.", default="3G", type=mem_check)
@@ -266,6 +266,7 @@ def dedup(args):
                                                 "--output=-",
                                                 "--start-only" if args.start_only else "",
                                                 "--seed", str(args.seed),
+                                                "--paired" if args.paired else "",
                                                 "--uncompressed",
                                                 "--input-threads", ithreads], stdout=subprocess.PIPE)
     sort_process = subprocess.Popen(["samtools", "sort", "-n", "-l0", "-@", str(sort_threads), "-m", memory_per_thread], stdin=dedup_process.stdout, stdout=subprocess.PIPE)
