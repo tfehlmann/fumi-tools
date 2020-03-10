@@ -437,7 +437,9 @@ void process_bam_read_chunks_helper(samFile* file, bam_hdr_t* bam_hdr, umi_opts 
       progress.update();
     }
     output_positions(nonstd::nullopt, std::numeric_limits<int32_t>::max());
-    std::cout << not_yet_paired_reads << std::endl;
+    if(!not_yet_paired_reads.empty()) {
+      std::cerr << not_yet_paired_reads << std::endl;
+    }
     for(auto& read: not_yet_paired_reads){
         if(sam_write1(out, bam_hdr, read.get()) < 0){
           std::cerr << "Failed to write to output file!" << std::endl;
