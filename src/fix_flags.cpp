@@ -167,8 +167,9 @@ mapq_stats get_best_mapq(
 std::array<int64_t, 3> get_second_best_as(
     const std::vector<std::unique_ptr<bam1_t, bam1_t_deleter>>& reads,
     const mapq_stats& stats) {
+  auto has_as = bam_aux_get(reads[0].get(), "AS") != nullptr;
   auto second_best_as_r1 = [&]() {
-    if (stats.num_r1_reads == 0) {
+    if (stats.num_r1_reads == 0 || !has_as) {
       return -1l;
     }
     auto idx = stats.num_r1_reads == 1 ? 0ul : 1ul;
@@ -177,7 +178,7 @@ std::array<int64_t, 3> get_second_best_as(
     return bam_aux2i(r_as_tag);
   }();
   auto second_best_as_r2 = [&]() {
-    if (stats.num_r2_reads == 0) {
+    if (stats.num_r2_reads == 0 || !has_as) {
       return -1l;
     }
     auto idx =
@@ -187,7 +188,7 @@ std::array<int64_t, 3> get_second_best_as(
     return bam_aux2i(r_as_tag);
   }();
   auto second_best_as_other = [&]() {
-    if (stats.num_other_reads == 0) {
+    if (stats.num_other_reads == 0 || !has_as) {
       return -1l;
     }
     auto idx = stats.num_other_reads == 1
@@ -221,7 +222,7 @@ std::size_t set_primary_alignment(
     auto r1_props = get_aln_props_wo_flag_info(r1, has_hi);
     auto r2_props = get_aln_props_wo_flag_info(r2, has_hi);
 
-    if (r2 == nullptr || r1_props < r2_props) {
+    if (r1 != nullptr && (r2 == nullptr || r1_props < r2_props)) {
       ++r1_idx;
       ++distinct_alignments;
       if (stats.best_r1_i >= 0) {
@@ -231,7 +232,7 @@ std::size_t set_primary_alignment(
           add_flag(r1, BAM_FSECONDARY);
         }
       }
-    } else if (r1 == nullptr || r1_props > r2_props) {
+    } else if (r2 != nullptr && (r1 == nullptr || r1_props > r2_props)) {
       ++distinct_alignments;
       ++r2_idx;
       add_flag(r2, BAM_FSECONDARY);
@@ -270,10 +271,10 @@ void update_xs_nh_hi_fields(
     const std::vector<std::unique_ptr<bam1_t, bam1_t_deleter>>& reads,
     const mapq_stats& stats,
     std::size_t distinct_alignments,
-    std::array<int64_t, 3>& second_best_as,
-    bool has_nh,
-    bool has_as) {
+    std::array<int64_t, 3>& second_best_as) {
   auto has_xs = bam_aux_get(reads[0].get(), "XS") != nullptr;
+  auto has_as = bam_aux_get(reads[0].get(), "AS") != nullptr;
+  auto has_nh = bam_aux_get(reads[0].get(), "NH") != nullptr;
   // update second best alignment score (XS), number of hits (NH) and hit index
   // (HI) fields
   for (auto i = 0ul; i < reads.size(); ++i) {
@@ -317,8 +318,6 @@ void fix_and_output_read_flags(
   // alignment
   // collect second best alignment score, if available, to update the XS tag
   // accordingly
-  auto has_nh = bam_aux_get(reads[0].get(), "NH") != nullptr;
-  auto has_as = bam_aux_get(reads[0].get(), "AS") != nullptr;
   auto has_hi = bam_aux_get(reads[0].get(), "HI") != nullptr;
 
   // order so that we have first r1, then r2, then unpaired
@@ -336,7 +335,7 @@ void fix_and_output_read_flags(
   auto second_best_as = get_second_best_as(reads, mapq_stats);
 
   auto distinct_alignments = set_primary_alignment(reads, mapq_stats, has_hi);
-  update_xs_nh_hi_fields(reads, mapq_stats, distinct_alignments, second_best_as, has_nh, has_as);
+  update_xs_nh_hi_fields(reads, mapq_stats, distinct_alignments, second_best_as);
 
   for (auto& r : reads) {
     if (sam_write1(outfile, bam_hdr, r.get()) < 0) {
