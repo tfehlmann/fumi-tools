@@ -106,9 +106,9 @@ fumi_tools copy_umi --input dummy.fastq.gz --umi-length {umi_length} --output du
 After you aligned the reads (e.g. with STAR) deduplicate them:
 
 ```bash
-usage: fumi_tools dedup [-h] -i INPUT -o OUTPUT [--start-only]
-                        [--threads THREADS] [--memory MEMORY] [--seed SEED]
-                        [--version]
+usage: fumi_tools dedup [-h] -i INPUT -o OUTPUT [--paired] [--start-only]
+                        [--threads THREADS] [--memory MEMORY]
+                        [--seed SEED] [--version]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -117,11 +117,11 @@ optional arguments:
   -o OUTPUT, --output OUTPUT
                         Output SAM or BAM file, sorted by read name. To output
                         SAM on stdout use '-'.
+  --paired              Specify this option if your input contains paired end reads.
   --start-only          Reads only need the same start position and the same
-                        UMI to be considered duplicates. (default: False)
+                        UMI to be considered duplicates.
   --threads THREADS     Number of threads to use. (default: 1)
-  --memory MEMORY       Maximum memory used for sorting. Units can be K/M/G.
-                        (default: 3G)
+  --memory MEMORY       Maximum memory used for sorting. Units can be K/M/G. (default: 3G)
   --seed SEED           Random number generator seed. (default: 42)
   --version             Display version number.
 ```
