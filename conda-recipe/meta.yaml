@@ -17,10 +17,8 @@ requirements:
     - {{ compiler('c') }}
     - {{ compiler('cxx') }}
   host:
-    - python
     - zlib
   run:
-    - python
     - zlib
     - pigz
 
