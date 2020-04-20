@@ -101,13 +101,13 @@ namespace std {
 template <>
 struct hash<fumi_tools::read_group> {
   std::size_t operator()(const fumi_tools::read_group& lhs) const noexcept {
-    return lhs.is_spliced ^ lhs.is_spliced ^ hash<uint16_t>()(lhs.read_len);
+    return lhs.is_spliced ^ lhs.is_reversed ^ hash<uint16_t>()(lhs.read_len);
   }
 };
 template <>
 struct hash<fumi_tools::read_group_paired> {
   std::size_t operator()(const fumi_tools::read_group_paired& lhs) const noexcept {
-    return lhs.is_spliced ^ lhs.is_spliced ^ hash<uint16_t>()(lhs.read_len) ^ hash<int32_t>()(lhs.template_len);
+    return lhs.is_spliced ^ lhs.is_reversed ^ hash<uint16_t>()(lhs.read_len) ^ hash<int32_t>()(lhs.template_len);
   }
 };
 
