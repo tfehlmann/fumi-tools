@@ -88,9 +88,8 @@ void remove_flag(bam1_t* b, uint16_t flag) {
   b->core.flag &= ~flag;
 }
 
-std::array<int64_t, 4>
-get_aln_props_wo_flag_info(const bam1_t* lhs,
-                           bool has_hi) {
+std::array<int64_t, 4> get_aln_props_wo_flag_info(const bam1_t* lhs,
+                                                  bool has_hi) {
   if (lhs == nullptr) {
     return {};
   }
@@ -110,16 +109,17 @@ get_aln_props_wo_flag_info(const bam1_t* lhs,
   return {lhs_tid, lhs_pos, lhs_isize, lhs_hi};
 }
 
-std::tuple<bool, bool, int64_t, int64_t, int64_t, int64_t>
-get_aln_props(const bam1_t* lhs, bool has_hi) {
+std::tuple<bool, bool, int64_t, int64_t, int64_t, int64_t> get_aln_props(
+    const bam1_t* lhs,
+    bool has_hi) {
   if (lhs == nullptr) {
     return {};
   }
   auto lhs_is_r1 = (lhs->core.flag & BAM_FREAD1) != 0;
   auto lhs_is_r2 = (lhs->core.flag & BAM_FREAD2) != 0;
   auto props = get_aln_props_wo_flag_info(lhs, has_hi);
-  return std::make_tuple(!lhs_is_r1, !lhs_is_r2, props[0],
-                         props[1], props[2], props[3]);
+  return std::make_tuple(!lhs_is_r1, !lhs_is_r2, props[0], props[1], props[2],
+                         props[3]);
 }
 
 struct mapq_stats {
@@ -135,9 +135,9 @@ mapq_stats get_best_mapq(
     const std::vector<std::unique_ptr<bam1_t, bam1_t_deleter>>& reads) {
   mapq_stats result{};
 
-  auto best_mapq_r1 = 0;
-  auto best_mapq_r2 = 0;
-  auto best_mapq_other = 0;
+  auto best_mapq_r1 = std::numeric_limits<int32_t>::min();
+  auto best_mapq_r2 = std::numeric_limits<int32_t>::min();
+  auto best_mapq_other = std::numeric_limits<int32_t>::min();
 
   for (auto i = 0ul; i < reads.size(); ++i) {
     auto qual = reads[i]->core.qual;
@@ -280,10 +280,12 @@ void update_xs_nh_hi_fields(
   for (auto i = 0ul; i < reads.size(); ++i) {
     if (has_nh) {
       if ((reads[i]->core.flag & BAM_FREAD1) != 0) {
-        bam_aux_update_int(reads[i].get(), "NH", as_signed(distinct_alignments));
+        bam_aux_update_int(reads[i].get(), "NH",
+                           as_signed(distinct_alignments));
         bam_aux_update_int(reads[i].get(), "HI", as_signed(i + 1));
       } else if ((reads[i]->core.flag & BAM_FREAD2) != 0) {
-        bam_aux_update_int(reads[i].get(), "NH", as_signed(distinct_alignments));
+        bam_aux_update_int(reads[i].get(), "NH",
+                           as_signed(distinct_alignments));
         bam_aux_update_int(reads[i].get(), "HI",
                            as_signed(i + 1 - stats.num_r1_reads));
       } else {
@@ -320,22 +322,57 @@ void fix_and_output_read_flags(
   // accordingly
   auto has_hi = bam_aux_get(reads[0].get(), "HI") != nullptr;
 
+  // quick path
+  if (reads.size() == 1) {
+    auto r = reads[0].get();
+    // set primary aln
+    remove_flag(r, BAM_FSECONDARY);
+    auto aux_xs = bam_aux_get(r, "XS");
+    auto has_xs = aux_xs != nullptr;
+    auto aux_as = bam_aux_get(r, "AS");
+    auto has_as = aux_as != nullptr;
+    auto aux_nh = bam_aux_get(r, "NH");
+    auto has_nh = aux_nh != nullptr;
+
+    if (has_as && has_xs) {
+      // second best aln score is self
+      auto update = bam_aux2i(aux_as);
+      if (update != bam_aux2i(aux_xs)) {
+        bam_aux_update_int(r, "XS", bam_aux2i(aux_as));
+      }
+    }
+    if (has_nh) {
+      if (bam_aux2i(aux_nh) != 1) {
+        bam_aux_update_int(r, "NH", 1);
+      }
+      auto aux_hi = bam_aux_get(r, "HI");
+
+      if (aux_hi != nullptr && bam_aux2i(aux_hi) != 1) {
+        bam_aux_update_int(r, "HI", 1);
+      }
+    }
+    if (sam_write1(outfile, bam_hdr, r) < 0) {
+      std::cerr << "Failed to write to output file!" << std::endl;
+      std::exit(1);
+    }
+    return;
+  }
+
   // order so that we have first r1, then r2, then unpaired
   // r1 and r2 ordered the same way such that if they are paired they come in
   // the same order possibility 1: only r1 without paired mate 2: only r2
   // without paired mate 3: r1 & r2 paired 4: not paired
-  std::sort(reads.begin(), reads.end(),
-            [has_hi](auto& lhs, auto& rhs) {
-              return get_aln_props(lhs.get(), has_hi) <
-                     get_aln_props(rhs.get(), has_hi);
-            });
+  std::stable_sort(reads.begin(), reads.end(), [has_hi](auto& lhs, auto& rhs) {
+    return get_aln_props(lhs.get(), has_hi) < get_aln_props(rhs.get(), has_hi);
+  });
 
   // get best mapping qualities for r1, r2 and rest
   auto mapq_stats = get_best_mapq(reads);
   auto second_best_as = get_second_best_as(reads, mapq_stats);
 
   auto distinct_alignments = set_primary_alignment(reads, mapq_stats, has_hi);
-  update_xs_nh_hi_fields(reads, mapq_stats, distinct_alignments, second_best_as);
+  update_xs_nh_hi_fields(reads, mapq_stats, distinct_alignments,
+                         second_best_as);
 
   for (auto& r : reads) {
     if (sam_write1(outfile, bam_hdr, r.get()) < 0) {
@@ -362,7 +399,8 @@ void process_bam_read_chunks(samFile* infile,
   bam1_t* record = bam_init1();
   while (sam_read1(infile, bam_hdr, record) > 0) {
     if ((record->core.flag & BAM_FUNMAP) == 0) {
-      auto qname = nonstd::string_view(bam_get_qname(record));
+      auto qname = nonstd::string_view(bam_get_qname(record),
+                                       std::strlen(bam_get_qname(record)));
       if (qname != last_qname) {
         // fix flags for this chunk of reads and output them
         fix_and_output_read_flags(reads, bam_hdr, outfile);
