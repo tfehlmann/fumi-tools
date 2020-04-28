@@ -399,6 +399,10 @@ void process_bam_read_chunks_helper(samFile* file,
   bam1_t* record = bam_init1();
   while (sam_read1(file, bam_hdr, record) > 0) {
     if ((record->core.flag & BAM_FUNMAP) == 0) {
+      if (is_paired && (record->core.flag & BAM_FMUNMAP) != 0 &&
+          opts.unpaired_reads == "discard") {
+        continue;
+      }
       if (is_paired && (record->core.flag & BAM_FREAD2) != 0) {
         if (record->core.tid <= cur_ref) {
           // we already saw r1
@@ -447,6 +451,7 @@ void process_bam_read_chunks_helper(samFile* file,
       if (is_paired && (record->core.flag & BAM_FPAIRED) != 0 &&
           record->core.tid != record->core.mtid) {
         // chimeric read pair
+        // other possibility is "use", which is implicitly handled
         if (opts.chimeric_pairs == "discard") {
           bam1_t dummy = build_mate_bam1_dummy(*record);
           std::unique_ptr<bam1_t, bam1_t_deleter> dummy_ptr(&dummy);
@@ -481,7 +486,7 @@ void process_bam_read_chunks_helper(samFile* file,
   if (is_paired && SHOW_DEBUG_OUTPUT && !not_yet_paired_reads.empty()) {
     std::cerr << not_yet_paired_reads << std::endl;
   }
-  if (is_paired) {
+  if (is_paired && opts.unpaired_reads == "use") {
     for (auto& read : not_yet_paired_reads) {
       if (sam_write1(out, bam_hdr, read.get()) < 0) {
         std::cerr << "Failed to write to output file!" << std::endl;

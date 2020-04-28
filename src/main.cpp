@@ -23,6 +23,13 @@ void required_options(cxxopts::Options& opts,
   }
 }
 
+void check_valid_values(const std::string& val, const std::initializer_list<std::string>& valid_values, const std::string& option_name){
+  bool valid = std::find(valid_values.begin(), valid_values.end(), val) != valid_values.end();
+  if(!valid){
+      throw std::runtime_error(fmt::format("Unknown value passed to option '{}': '{}'. Valid options are: {}", option_name, val, fmt::join(valid_values, "|")));
+   }
+}
+
 enum class Format { BAM, SAM, UNKNOWN };
 
 Format check_format(nonstd::string_view sv) {
@@ -49,10 +56,10 @@ auto parse_options(int argc, char* argv[]) {
 //      ("method", "Which method to use to collapse the UMIs. ", cxxopts::value<std::string>()->default_value("")) only unique supported for now
       ("start-only", "Reads only need the same start position and the same UMI to be considered duplicates.")
       ("paired", "Specifiy this option if your alignment file contains paired end reads.")
-      ("chimeric-pairs", "How to handle chimeric read pairs. (discard|use)", cxxopts::value<std::string>(umi_opts.chimeric_pairs))
-      ("unpaired-reads", "How to handle unpaired reads. (discard|use|output)", cxxopts::value<std::string>(umi_opts.unpaired_reads))
+      ("chimeric-pairs", "How to handle chimeric read pairs. (discard|use)", cxxopts::value<std::string>(umi_opts.chimeric_pairs)->default_value("use"))
+      ("unpaired-reads", "How to handle unpaired reads (e.g. mate did not align) (discard|use)", cxxopts::value<std::string>(umi_opts.unpaired_reads)->default_value("use"))
       ("uncompressed", "Output uncompressed BAM.")
-      ("seed", "Random number generator seed.", cxxopts::value<uint64_t>(umi_opts.seed))
+      ("seed", "Random number generator seed.", cxxopts::value<uint64_t>(umi_opts.seed)->default_value("42"))
       ("version", "Display version number.")
       ("h,help", "Show this dialog.")
 //      ("max-hamming-dist", "Maximum hamming distance for which to collapse umis.", cxxopts::value<uint32_t>(umi_opts.max_ham_dist)->default_value("1")) not yet supported
@@ -75,6 +82,9 @@ auto parse_options(int argc, char* argv[]) {
     }
     required_options(
         opts, {"input", "output"});
+    check_valid_values(umi_opts.chimeric_pairs, {"use", "discard"}, "chimeric-pairs");
+    check_valid_values(umi_opts.unpaired_reads, {"use", "discard"}, "unpaired-reads");
+
     umi_opts.read_length = opts["paired"].as<bool>() ? false : !opts["start-only"].as<bool>();
     umi_opts.uncompressed = opts["uncompressed"].as<bool>();
     umi_opts.paired = opts["paired"].as<bool>();
