@@ -89,9 +89,9 @@ Available commands are:
     def copy_umi(self):
         parser = argparse.ArgumentParser(prog="fumi_tools copy_umi", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         parser.add_argument("-i", "--input", help="Input FASTQ file, optionally gzip compressed.", required=True, type=ext_check(".fastq", ".fq", ".fastq.gz", ".fq.gz"), default=argparse.SUPPRESS)
-        parser.add_argument("--input-read2", help="Input paired end R2 FASTQ file, optionally gzip compressed.", required=False, type=ext_check(".fastq", ".fq", ".fastq.gz", ".fq.gz"), default=argparse.SUPPRESS)
+        parser.add_argument("-I", "--input-read2", help="Input paired end R2 FASTQ file, optionally gzip compressed.", required=False, type=ext_check(".fastq", ".fq", ".fastq.gz", ".fq.gz"), default=argparse.SUPPRESS)
         parser.add_argument("-o", "--output", help="Output FASTQ file, optionally gzip compressed.", required=True, type=ext_check(".fastq", ".fq", ".fastq.gz", ".fq.gz"), default=argparse.SUPPRESS)
-        parser.add_argument("--output-read2", help="Output paired end R2 FASTQ file, optionally gzip compressed.", required=False, type=ext_check(".fastq", ".fq", ".fastq.gz", ".fq.gz"), default=argparse.SUPPRESS)
+        parser.add_argument("-O", "--output-read2", help="Output paired end R2 FASTQ file, optionally gzip compressed.", required=False, type=ext_check(".fastq", ".fq", ".fastq.gz", ".fq.gz"), default=argparse.SUPPRESS)
         parser.add_argument("--umi-length", help="Length of the UMI to copy. It is assumed that the UMI starts at the 5' end of the read.", type=int, required=True)
         parser.add_argument("--threads", help="Number of threads to use.", default=1, type=int)
         parser.add_argument("--version", help="Display version number.", action='version', version=VERSION)
