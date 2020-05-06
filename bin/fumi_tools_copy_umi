@@ -257,6 +257,9 @@ class PipedGzipReader(Closing):
     def __next__(self):
         return self._file.__next__()
 
+    def next(self):
+        return self._file.next()
+
     def _raise_if_error(self, allow_sigterm=False):
         """
         Raise IOError if process is not running anymore and the exit code is
@@ -437,8 +440,8 @@ if not paired_end:
                 of.write(l)
 
 else:
-    othreads1 = math.ceil(max((args.threads - 2)/2, 1))
-    othreads2 = math.floor(max((args.threads - 2)/2, 1))
+    othreads1 = int(math.ceil(max((args.threads - 2)/2, 1)))
+    othreads2 = int(math.floor(max((args.threads - 2)/2, 1)))
     with xopen(args.input) as f, xopen(args.output, 'w', threads=othreads1) as of,\
         xopen(args.input_read2) as f2, xopen(args.output_read2, 'w', threads=othreads2) as of2:
         for i, (l1, l2) in enumerate(zip(f, f2)):
