@@ -178,6 +178,16 @@ bam1_t build_mate_bam1_dummy(const bam1_t& read) {
   return dummy;
 }
 
+bool read_is_potentially_after_mate(const bam1_t& read){
+  return (read.core.mtid < read.core.tid ||
+   (read.core.mtid == read.core.tid && read.core.pos >= read.core.mpos));
+}
+
+bool read_is_after_mate(const bam1_t& read){
+  return (read.core.mtid < read.core.tid ||
+   (read.core.mtid == read.core.tid && read.core.pos > read.core.mpos));
+}
+
 template <class ReadGroup, bool is_paired>
 void update_read_map(
     bam1_t* read,
@@ -211,9 +221,7 @@ void update_read_map(
     auto other_qual = res.first->core.qual;
     if (read_qual < other_qual) {
       // bad qual so drop pair
-      if (is_paired &&
-          (read->core.mtid < read->core.tid ||
-           (read->core.mtid == read->core.tid && read->core.isize <= 0))) {
+      if (is_paired && read_is_potentially_after_mate(*read)) {
         bam1_t dummy = build_mate_bam1_dummy(*read);
         std::unique_ptr<bam1_t, bam1_t_deleter> dummy_ptr(&dummy);
         paired_read_map.erase(dummy_ptr);
@@ -223,9 +231,7 @@ void update_read_map(
     }
     if (read_qual > other_qual) {
       // replace with other read, so remove paired
-      if (is_paired && (res.first->core.mtid < res.first->core.tid ||
-                        (res.first->core.mtid == res.first->core.tid &&
-                         res.first->core.isize <= 0))) {
+      if (is_paired && read_is_potentially_after_mate(*res.first)) {
         bam1_t dummy = build_mate_bam1_dummy(*res.first);
         std::unique_ptr<bam1_t, bam1_t_deleter> dummy_ptr(&dummy);
         paired_read_map.erase(dummy_ptr);
@@ -246,9 +252,7 @@ void update_read_map(
     auto prob = 1.0 / count_res;
 
     if (udistrib(rand_gen) < prob) {
-      if (is_paired && (res.first->core.mtid < res.first->core.tid ||
-                        (res.first->core.mtid == res.first->core.tid &&
-                         res.first->core.isize <= 0))) {
+      if (is_paired && read_is_potentially_after_mate(*res.first)) {
         bam1_t dummy = build_mate_bam1_dummy(*res.first);
         std::unique_ptr<bam1_t, bam1_t_deleter> dummy_ptr(&dummy);
         paired_read_map.erase(dummy_ptr);
@@ -264,9 +268,7 @@ void update_read_map(
       }
     } else {
       // bad qual so drop pair
-      if (is_paired &&
-          (read->core.mtid < read->core.tid ||
-           (read->core.mtid == read->core.tid && read->core.isize <= 0))) {
+      if (is_paired && read_is_potentially_after_mate(*read)) {
         bam1_t dummy = build_mate_bam1_dummy(*read);
         std::unique_ptr<bam1_t, bam1_t_deleter> dummy_ptr(&dummy);
         paired_read_map.erase(dummy_ptr);
@@ -406,7 +408,7 @@ void process_bam_read_chunks_helper(samFile* file,
       if (is_paired && (record->core.flag & BAM_FREAD2) != 0) {
         if (record->core.tid <= cur_ref) {
           // we already saw r1
-          if (record->core.isize < 0 || record->core.tid < cur_ref) {
+          if (record->core.mpos < record->core.pos || record->core.tid < cur_ref) {
             bam1_t dummy = build_mate_bam1_dummy(*record);
             // keep paired read only if we kept r1
             if (current_reads.find(&dummy) != current_reads.end()) {
