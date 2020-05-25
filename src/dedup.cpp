@@ -246,6 +246,7 @@ void update_read_map(
         current_reads.insert(new_read);
       }
       read_counts[pos][key][umi] = 0;
+      return;
     }
     auto& count_res = read_counts[pos][key][umi];
     ++count_res;
