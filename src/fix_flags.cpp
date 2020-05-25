@@ -31,6 +31,7 @@ auto parse_options(int argc, char* argv[]) {
       ("o,output", "Output SAM or BAM file.", cxxopts::value<std::string>())
       ("input-threads", "Number of threads to decompress input.", cxxopts::value<uint64_t>()->default_value("1"))
       ("output-threads", "Number of threads to compress output.", cxxopts::value<uint64_t>()->default_value("1"))
+      ("sort-adjacent-pairs", "Keep name sorting, but sort pairs such that R2 always follows R1.")
       ("version", "Display version number.")
       ("help", "Show this dialog.")
       ;
@@ -308,9 +309,17 @@ void update_xs_nh_hi_fields(
   }
 }
 
+bool get_pattern_code(uint32_t flag) {
+  if ((flag & BAM_FREAD1) != 0)
+    return (flag & BAM_FREVERSE) != 0;
+  else
+    return (flag & BAM_FREVERSE) == 0;
+}
+
 void fix_and_output_read_flags(
     std::vector<std::unique_ptr<bam1_t, bam1_t_deleter>>& reads,
     bam_hdr_t* bam_hdr,
+    bool rsem_sort,
     samFile* outfile) {
   if (reads.empty()) {
     return;
@@ -374,6 +383,31 @@ void fix_and_output_read_flags(
   update_xs_nh_hi_fields(reads, mapq_stats, distinct_alignments,
                          second_best_as);
 
+  if (rsem_sort) {
+    auto rsem_less = [](const auto& lhs, const auto& rhs) {
+      auto lhsp = std::minmax(lhs->core.pos, lhs->core.mpos);
+      auto rhsp = std::minmax(rhs->core.pos, rhs->core.mpos);
+      auto lhspat = get_pattern_code(lhs->core.flag);
+      auto rhspat = get_pattern_code(rhs->core.flag);
+
+      if (lhs->core.tid != rhs->core.tid) {
+        return lhs->core.tid < rhs->core.tid;
+      }
+      if (lhsp.first != rhsp.first) {
+        return lhsp.first < rhsp.first;
+      }
+      if (lhsp.second != rhsp.second) {
+        return lhsp.second < rhsp.second;
+      }
+      return lhspat < rhspat;
+    };
+    std::sort(reads.begin(), reads.end(), rsem_less);
+  } else {
+    auto samtools_less = [](const auto& lhs, const auto& rhs) {
+      return (lhs->core.flag & 0xc0) < (rhs->core.flag & 0xc0);
+    };
+    std::sort(reads.begin(), reads.end(), samtools_less);
+  }
   for (auto& r : reads) {
     if (sam_write1(outfile, bam_hdr, r.get()) < 0) {
       std::cerr << "Failed to write to output file!" << std::endl;
@@ -382,8 +416,21 @@ void fix_and_output_read_flags(
   }
 }
 
+nonstd::string_view get_canonical_name(const bam1_t* record) {
+  // keep only up to first whitespace in case the aligner did not trim the end
+  // off
+  nonstd::string_view qname(bam_get_qname(record),
+                            std::strlen(bam_get_qname(record)));
+  auto end = qname.find_last_not_of(" \t\n");
+  if (end != nonstd::string_view::npos) {
+    qname.remove_suffix(qname.size() - end - 1);
+  }
+  return qname;
+}
+
 void process_bam_read_chunks(samFile* infile,
                              bam_hdr_t* bam_hdr,
+                             bool sort_rsem,
                              samFile* outfile) {
   std::vector<std::unique_ptr<bam1_t, bam1_t_deleter>> reads;
 
@@ -399,11 +446,10 @@ void process_bam_read_chunks(samFile* infile,
   bam1_t* record = bam_init1();
   while (sam_read1(infile, bam_hdr, record) > 0) {
     if ((record->core.flag & BAM_FUNMAP) == 0) {
-      auto qname = nonstd::string_view(bam_get_qname(record),
-                                       std::strlen(bam_get_qname(record)));
+      auto qname = get_canonical_name(record);
       if (qname != last_qname) {
         // fix flags for this chunk of reads and output them
-        fix_and_output_read_flags(reads, bam_hdr, outfile);
+        fix_and_output_read_flags(reads, bam_hdr, sort_rsem, outfile);
         reads.clear();
         last_qname.assign(qname.begin(), qname.end());
       }
@@ -411,12 +457,13 @@ void process_bam_read_chunks(samFile* infile,
     }
     progress.update();
   }
-  fix_and_output_read_flags(reads, bam_hdr, outfile);
+  fix_and_output_read_flags(reads, bam_hdr, sort_rsem, outfile);
   bam_destroy1(record);
 }
 
 void fix_flags(const std::string& input,
                const std::string& output,
+               bool sort_rsem,
                uint64_t ithreads,
                uint64_t othreads) {
   samFile* file = hts_open(input.c_str(), "r");
@@ -447,7 +494,7 @@ void fix_flags(const std::string& input,
         fmt::format("Could not write header to file '{}'", output));
   }
 
-  process_bam_read_chunks(file, bam_hdr, out);
+  process_bam_read_chunks(file, bam_hdr, sort_rsem, out);
 
   bam_hdr_destroy(bam_hdr);
 
@@ -475,6 +522,7 @@ int main(int argc, char* argv[]) {
   }
   fumi_tools::fix_flags(vm_opts["input"].as<std::string>(),
                         vm_opts["output"].as<std::string>(),
+                        vm_opts["sort-adjacent-pairs"].as<bool>(),
                         vm_opts["input-threads"].as<uint64_t>(),
                         vm_opts["output-threads"].as<uint64_t>());
   return 0;

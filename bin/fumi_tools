@@ -82,6 +82,7 @@ Available commands are:
         parser.add_argument("--start-only", help="Reads only need the same start position and the same UMI to be considered duplicates.", action='store_true')
         parser.add_argument("--chimeric-pairs", help="How to handle chimeric read pairs. (discard|use)", default="use", choices=["discard", "use"], nargs='?', const='use')
         parser.add_argument("--unpaired-reads", help="How to handle unpaired reads (e.g. mate did not align) (discard|use)", default="use", choices=["discard", "use"], nargs='?', const='use')
+        parser.add_argument("--sort-adjacent-pairs", help="Keep name sorting, but sort pairs such that the mate always follows the first read.", action='store_true')
         parser.add_argument("--threads", help="Number of threads to use.", default=1, type=int)
         parser.add_argument("--memory", help="Maximum memory used for sorting. Units can be K/M/G.", default="3G", type=mem_check)
         parser.add_argument("--seed", help="Random number generator seed.", default=42, type=int)
@@ -133,6 +134,7 @@ def dedup(args):
     sort_process = subprocess.Popen(["samtools", "sort", "-n", "-l0", "-@", str(sort_threads), "-m", memory_per_thread], stdin=dedup_process.stdout, stdout=subprocess.PIPE)
     fix_process = subprocess.Popen([fumi_fix, "--input=-",
                                             "--output", args.output,
+                                            "--sort-adjacent-pairs" if args.sort_adjacent_pairs else "",
                                             "--input-threads", ithreads,
                                             "--output-threads", str(args.threads)], stdin=sort_process.stdout)
     dedup_process.stdout.close()
