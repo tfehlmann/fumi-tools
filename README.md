@@ -3,7 +3,7 @@
 
 # fumi-tools
 
-This tool is intended to deduplicate UMIs from single-end sequencing data. Reads are considered identical when their UMIs have the same sequence, they have the same length and map at the same position.
+This tool is intended to deduplicate UMIs from single-end and paired-end sequencing data. Reads are considered identical when their UMIs have the same sequence, they have the same length and map at the same position.
 
 ## Installation
 
@@ -120,6 +120,12 @@ optional arguments:
   --paired              Specify this option if your input contains paired end reads.
   --start-only          Reads only need the same start position and the same
                         UMI to be considered duplicates.
+  --chimeric-pairs [{discard,use}]
+                        How to handle chimeric read pairs. (default: use)
+  --unpaired-reads [{discard,use}]
+                        How to handle unpaired reads (e.g. mate did not align) (default: use)
+  --sort-adjacent-pairs
+                        Keep name sorting, but sort pairs such that the mate always follows the first read.
   --threads THREADS     Number of threads to use. (default: 1)
   --memory MEMORY       Maximum memory used for sorting. Units can be K/M/G. (default: 3G)
   --seed SEED           Random number generator seed. (default: 42)
