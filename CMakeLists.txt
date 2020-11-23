@@ -44,9 +44,9 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 # NOT NEEDED RIGHT NOW BECAUSE LIBS ARE STATIC
 # the RPATH to be used when installing, but only if it's not a system directory
 list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
-if("${isSystemDir}" STREQUAL "-1")
+if("${isSystemDir}" STREQUAL "-1" AND ${BUILD_SHARED_LIBS})
    set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
-endif("${isSystemDir}" STREQUAL "-1")
+endif()
 
 
 # add own modules to the search path
