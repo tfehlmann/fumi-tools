@@ -4,4 +4,5 @@ cast_helper.hpp
 dedup.hpp
 umi_clusterer.hpp
 helper.hpp
+sample_index_map.hpp
 )
