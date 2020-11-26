@@ -72,8 +72,10 @@ Available commands are:
         parser = argparse.ArgumentParser(prog="fumi_tools demultiplex", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         parser.add_argument("-i", "--input", help="Input FASTQ file, optionally gzip compressed.", required=True, type=ext_check(*VALID_EXTS), default=argparse.SUPPRESS)
         parser.add_argument("-s", "--sample-sheet", help="Sample Sheet in Illumina format.", required=True)
-        parser.add_argument("-o", "--output", help="Output FASTQ file pattern, optionally gzip compressed. Use %i as placeholder for the sample index specified in the sample sheet and %s for the sample name (e.g. demultiplexed_reads/%s_S%i_L001_R1.fastq.gz).", required=True, type=ext_check(*VALID_EXTS), default=argparse.SUPPRESS)
+        parser.add_argument("-o", "--output", help="Output FASTQ file pattern, optionally gzip compressed. Use %i as placeholder for the sample index specified in the sample sheet, %s for the sample name and %l for the lane (e.g. demultiplexed_reads/%s_S%i_L%l_R1.fastq.gz).", required=True, type=ext_check(*VALID_EXTS), default=argparse.SUPPRESS)
         parser.add_argument("-e", "--max-errors", help="Maximum allowed number of errors (mismatches per default).", type=int, default=1)
+        parser.add_argument("-l", "--lane", help="Optionally specify on which lane the samples provided in the sample sheet ran. Can be specified multiple times to pass several lanes. This option takes precedence on the Lane column of the sample sheet.",
+                            nargs='+', action='extend', type=str)
         parser.add_argument("--format-umi", help="Add UMI to the end of the FASTQ header, as expected by fumi_tools dedup", action="store_true")
         parser.add_argument("--threads", help="Number of threads to use.", default=1, type=int)
         parser.add_argument("--version", help="Display version number.", action='version', version=VERSION)
@@ -113,17 +115,23 @@ def demultiplex(args):
     if not exists(dirname(args.output)):
         os.makedirs(dirname(args.output))
     try:
+        if args.lane:
+            lane_arg = ["--lane={}".format(l) for l in args.lane]
+        else:
+            lane_arg = ""
         result = subprocess.check_output([fumi_demultiplex, "--input", args.input,
                                           "--sample-sheet", args.sample_sheet,
                                           "--output", args.output,
                                           "--max-errors", str(args.max_errors),
                                           "--threads", str(args.threads),
-                                          "--format-umi" if args.format_umi else ""], stderr=subprocess.STDOUT)
+                                          "--format-umi" if args.format_umi else "",
+                                          *lane_arg], stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
         print("Demultiplexing file failed with code ({})!".format(e.returncode), file=sys.stderr)
         print(e.output.decode(), file=sys.stderr)
         return e.returncode
     return 0
+
 
 def copy_umi(args):
     if hasattr(args, 'input_read2'):

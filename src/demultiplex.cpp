@@ -42,6 +42,7 @@ auto parse_options(int argc, char* argv[]) {
       ("o,output", "Output FASTQ file pattern, optionally gzip compressed. Use %i as placeholder for the sample index specified in the sample sheet and %s for the sample name (e.g. demultiplexed_reads/%i_S%s_L001_R1.fastq.gz).", cxxopts::value<std::string>())
       ("e,max-errors", "Maximum allowed number of errors (mismatches per default).", cxxopts::value<unsigned int>()->default_value("1"))
       ("format-umi", "Add UMI to the end of the FASTQ header, as expected by fumi_tools dedup")
+      ("l,lane", "Optionally specify on which lane the samples provided in the sample sheet ran. Can be specified multiple times to pass several lanes. This option takes precedence on the Lane column of the sample sheet.", cxxopts::value<std::vector<unsigned int>>())
       ("threads", "Number of threads.", cxxopts::value<unsigned int>()->default_value("1"))
       ("version", "Display version number.")
       ("help", "Show this dialog.")
@@ -97,37 +98,38 @@ std::ostream& operator<<(std::ostream& os, const fq_entry& e) {
             << e.qual << '\n';
 }
 
-void demultiplex_serial(const std::string& input, const sample_index_map& map) {
-  zstr::ifstream ifs(input);
+// void demultiplex_serial(const std::string& input, const sample_index_map&
+// map) {
+//  zstr::ifstream ifs(input);
 
-  const auto& output_files = map.get_output_files();
-  uint64_t i = 0;
-  fq_entry current{};
-  for (std::string line; std::getline(ifs, line); ++i) {
-    if (i % 4 == 0) {
-      current.header = line;
-    } else if (i % 4 == 1) {
-      current.seq = line;
-    } else if (i % 4 == 2) {
-      current.desc = line;
-    } else if (i % 4 == 3) {
-      current.qual = line;
-      auto i7_start = current.header.rfind(":");
-      if (i7_start != std::string::npos) {
-        i7_start++;
-      }
-      auto i7 = nonstd::string_view(current.header.c_str() + i7_start,
-                                    map.get_i7_length());
-      auto i5 = nonstd::string_view(
-          current.header.c_str() + current.header.size() - map.get_i5_length(),
-          map.get_i5_length());
-      auto pos = map.find_indices(i7, i5);
-      if (pos != std::numeric_limits<uint64_t>::max()) {
-        (*output_files[pos]) << current;
-      }
-    }
-  }
-}
+//  const auto& output_files = map.get_output_files();
+//  uint64_t i = 0;
+//  fq_entry current{};
+//  for (std::string line; std::getline(ifs, line); ++i) {
+//    if (i % 4 == 0) {
+//      current.header = line;
+//    } else if (i % 4 == 1) {
+//      current.seq = line;
+//    } else if (i % 4 == 2) {
+//      current.desc = line;
+//    } else if (i % 4 == 3) {
+//      current.qual = line;
+//      auto i7_start = current.header.rfind(":");
+//      if (i7_start != std::string::npos) {
+//        i7_start++;
+//      }
+//      auto i7 = nonstd::string_view(current.header.c_str() + i7_start,
+//                                    map.get_i7_length());
+//      auto i5 = nonstd::string_view(
+//          current.header.c_str() + current.header.size() -
+//          map.get_i5_length(), map.get_i5_length());
+//      auto pos = map.find_indices(i7, i5);
+//      if (pos != std::numeric_limits<uint64_t>::max()) {
+//        (*output_files[pos]) << current;
+//      }
+//    }
+//  }
+//}
 
 // void demultiplex_parallel(const std::string& input,
 //                          const sample_index_map& map) {
@@ -188,16 +190,26 @@ void demultiplex_serial(const std::string& input, const sample_index_map& map) {
 //              }));
 //}
 
+unsigned int extract_lane(nonstd::string_view header) {
+  auto pos = header.find(":");
+  pos = header.find(":", pos + 1);
+  pos = header.find(":", pos + 1);
+  auto lane = std::strtoul(header.data() + pos + 1, nullptr, 10);
+  if (lane == 0) {
+    throw std::runtime_error(
+        fmt::format("Lane could not be extracted from header: {}", header));
+  }
+  return lane;
+}
+
 void demultiplex_parallel2(const std::string& input,
                            const sample_index_map& map,
                            bool format_umi,
                            unsigned int threads) {
   zstr::ifstream ifs(input);
 
-  const auto& output_files = map.get_output_files();
-
-  std::vector<std::queue<std::vector<std::pair<uint64_t, fq_entry>>>> t_queues(
-      threads);
+  std::vector<std::queue<std::vector<std::tuple<uint32_t, uint32_t, fq_entry>>>>
+      t_queues(threads);
   std::vector<std::mutex> t_mutexes(threads);
   std::vector<std::condition_variable> t_cvs(threads);
 
@@ -206,7 +218,7 @@ void demultiplex_parallel2(const std::string& input,
   out_threads.reserve(threads);
   for (auto i = 0ul; i < threads; ++i) {
     out_threads.emplace_back(
-        [i, &t_mutexes, &t_cvs, &t_queues, &output_files, &is_done]() {
+        [i, &map, &t_mutexes, &t_cvs, &t_queues, &is_done]() {
           while (true) {
             std::unique_lock<std::mutex> _(t_mutexes[i]);
             t_cvs[i].wait(_, [i, &t_queues] { return !t_queues[i].empty(); });
@@ -214,7 +226,8 @@ void demultiplex_parallel2(const std::string& input,
             t_queues[i].pop();
             _.unlock();
             for (auto& fq_entry : fq_entries) {
-              *output_files[fq_entry.first] << fq_entry.second;
+              map.get_output_file(std::get<0>(fq_entry), std::get<1>(fq_entry))
+                  << std::get<2>(fq_entry);
             }
             if (is_done && t_queues[i].empty()) {
               break;
@@ -247,6 +260,7 @@ void demultiplex_parallel2(const std::string& input,
       auto i5 = nonstd::string_view(
           current.header.c_str() + current.header.size() - map.get_i5_length(),
           map.get_i5_length());
+      auto lane = extract_lane(current.header);
       if (format_umi) {
         auto umi_length = current.header.size() - map.get_i5_length() -
                           i7_start - map.get_i7_length() - 1;
@@ -255,13 +269,14 @@ void demultiplex_parallel2(const std::string& input,
             umi_length);
         current.header += fmt::format("_{}", umi);
       }
-      auto pos = map.find_indices(i7, i5);
+      auto pos = map.find_indices(i7, i5, lane);
       if (pos != std::numeric_limits<uint64_t>::max()) {
         std::lock_guard<std::mutex> _(t_mutexes[pos % threads]);
         if (t_queues[pos % threads].empty()) {
           t_queues[pos % threads].push({});
         }
-        t_queues[pos % threads].front().push_back(std::make_pair(pos, current));
+        t_queues[pos % threads].front().push_back(
+            std::make_tuple(lane, pos, current));
         if (t_queues[pos % threads].front().size() > 4096) {
           t_cvs[pos % threads].notify_one();
         }
@@ -294,9 +309,11 @@ int main(int argc, char* argv[]) {
 
   // tbb::task_scheduler_init init(vm_opts["threads"].as<unsigned int>());
 
-  fumi_tools::sample_index_map map(vm_opts["sample-sheet"].as<std::string>(),
-                                   vm_opts["output"].as<std::string>(),
-                                   vm_opts["max-errors"].as<unsigned int>());
+  fumi_tools::sample_index_map map(
+      vm_opts["sample-sheet"].as<std::string>(),
+      vm_opts["output"].as<std::string>(),
+      vm_opts["max-errors"].as<unsigned int>(),
+      vm_opts["lane"].as<std::vector<unsigned int>>());
   fumi_tools::demultiplex_parallel2(vm_opts["input"].as<std::string>(), map,
                                     vm_opts["format-umi"].as<bool>(),
                                     vm_opts["threads"].as<unsigned int>());

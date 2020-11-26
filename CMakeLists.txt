@@ -11,6 +11,8 @@ if(NOT DEFINED CMAKE_BUILD_TYPE)
         set(CMAKE_BUILD_TYPE Release)
 endif()
 
+set(CMAKE_CXX_STANDARD 14)
+
 #configure static linking
 option(BUILD_SHARED_LIBS "Build a shared (ON) or static (OFF) executable" ON)
 option(BUILD_GENERIC "Build so that the code runs on other x86-64 CPUs as well" ON)
