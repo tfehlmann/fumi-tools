@@ -12,19 +12,6 @@
 #include <rapidcsv/rapidcsv.h>
 
 namespace {
-std::vector<std::string> split(const std::string& s, char delimiter) {
-  std::vector<std::string> result;
-  auto start = 0U;
-  auto end = s.find(delimiter);
-  while (end != std::string::npos) {
-    result.push_back(s.substr(start, end - start));
-    start = end + 1;
-    end = s.find(',', start);
-  }
-  result.push_back(s.substr(start, end - start));
-  return result;
-}
-
 uint64_t get_num_mismatches(nonstd::string_view lhs, nonstd::string_view rhs) {
   auto num_mismatches = 0ul;
   for (auto i = 0ul; i < lhs.size(); ++i) {
@@ -62,6 +49,11 @@ sample_index_map::sample_index_map(const std::string& sample_sheet,
   sstream << tbl_text;
   rapidcsv::Document doc(sstream);
   auto lane_i = doc.GetColumnIdx("Lane");
+  if (lane_i == -1 && lanes.empty()) {
+    std::cerr << "The lane(s) must be specified either on the command-line or in the sample sheet!"
+              << std::endl;
+    std::exit(1);
+  }
   auto i7_i = doc.GetColumnIdx("index");
   auto i5_i = doc.GetColumnIdx("index2");
   if (i7_i == -1) {
@@ -88,6 +80,22 @@ sample_index_map::sample_index_map(const std::string& sample_sheet,
   if (sample_n == -1) {
     std::cerr << "Failed to detect necessary sample name column called "
                  "'Sample_Name' in header of provided sample sheet!"
+              << std::endl;
+    std::exit(1);
+  }
+
+  auto si = output_pattern.find("%i");
+  auto sn = output_pattern.find("%s");
+  auto ln = output_pattern.find("%l");
+  if (si == nonstd::string_view::npos && sn == nonstd::string_view::npos) {
+    std::cerr << "At least the sample name (%s) or sample index (%i) "
+                 "placeholders need to be provided in the output"
+              << std::endl;
+    std::exit(1);
+  }
+
+  if (ln == nonstd::string_view::npos) {
+    std::cerr << "The lane (%l) placeholder needs to be provided in the output"
               << std::endl;
     std::exit(1);
   }
