@@ -71,8 +71,9 @@ Available commands are:
         VALID_EXTS = ["{}{}".format(fq, c) for fq in FQ_EXTS for c in COMPR]
         parser = argparse.ArgumentParser(prog="fumi_tools demultiplex", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         parser.add_argument("-i", "--input", help="Input FASTQ file, optionally gzip compressed.", required=True, type=ext_check(*VALID_EXTS), default=argparse.SUPPRESS)
+        parser.add_argument("-I", "--input-read2", help="Input paired end R2 FASTQ file, optionally gzip compressed.", required=False, type=ext_check(*VALID_EXTS), default=argparse.SUPPRESS)
         parser.add_argument("-s", "--sample-sheet", help="Sample Sheet in Illumina format.", required=True)
-        parser.add_argument("-o", "--output", help="Output FASTQ file pattern, optionally gzip compressed. Use %i as placeholder for the sample index specified in the sample sheet, %s for the sample name and %l for the lane (e.g. demultiplexed_reads/%s_S%i_L%l_R1.fastq.gz).", required=True, type=ext_check(*VALID_EXTS), default=argparse.SUPPRESS)
+        parser.add_argument("-o", "--output", help="Output FASTQ file pattern, optionally gzip compressed. Use %i as placeholder for the sample index specified in the sample sheet, %s for the sample name, %l for the lane and optionally %r for the read direction (e.g. demultiplexed_reads/%s_S%i_L%l_R%r.fastq.gz).", required=True, type=ext_check(*VALID_EXTS), default=argparse.SUPPRESS)
         parser.add_argument("-e", "--max-errors", help="Maximum allowed number of errors (mismatches per default).", type=int, default=1)
         parser.add_argument("-l", "--lane", help="Optionally specify on which lane the samples provided in the sample sheet ran. Can be specified multiple times to pass several lanes. This option takes precedence on the Lane column of the sample sheet.",
                             nargs='+', action='extend', type=str)
@@ -114,22 +115,45 @@ Available commands are:
 def demultiplex(args):
     if not exists(dirname(args.output)):
         os.makedirs(dirname(args.output))
-    try:
-        if args.lane:
-            lane_arg = ["--lane={}".format(l) for l in args.lane]
-        else:
-            lane_arg = ""
-        result = subprocess.check_output([fumi_demultiplex, "--input", args.input,
-                                          "--sample-sheet", args.sample_sheet,
-                                          "--output", args.output,
-                                          "--max-errors", str(args.max_errors),
-                                          "--threads", str(args.threads),
-                                          "--format-umi" if args.format_umi else "",
-                                          *lane_arg], stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as e:
-        print("Demultiplexing file failed with code ({})!".format(e.returncode), file=sys.stderr)
-        print(e.output.decode(), file=sys.stderr)
-        return e.returncode
+    if args.lane:
+        lane_arg = ["--lane={}".format(l) for l in args.lane]
+    else:
+        lane_arg = ""
+    out1 = args.output.replace("%r", "1")
+    threads1 = max(1, int(args.threads/2))
+    demultiplex_1 = subprocess.Popen([fumi_demultiplex, "--input", args.input,
+                                        "--sample-sheet", args.sample_sheet,
+                                        "--output", out1,
+                                        "--max-errors", str(args.max_errors),
+                                        "--threads", str(max(1, threads1)),
+                                        "--format-umi" if args.format_umi else "",
+                                        *lane_arg], stderr=subprocess.STDOUT)
+
+    if hasattr(args, 'input_read2'):
+        if "%r" not in args.output:
+            print("The read direction %r, was not found in --output argument, but it required if --input-read2 is provided.", file=sys.stderr)
+            return 1
+        out2 = args.output.replace("%r", "2")
+        threads2 = max(args.threads - threads1, 1)
+        demultiplex_2 = subprocess.Popen([fumi_demultiplex, "--input", args.input_read2,
+                                            "--sample-sheet", args.sample_sheet,
+                                            "--output", out2,
+                                            "--max-errors", str(args.max_errors),
+                                            "--threads", str(threads2),
+                                            "--format-umi" if args.format_umi else "",
+                                            *lane_arg], stderr=subprocess.STDOUT)
+    
+    if demultiplex_1.wait() != 0:
+        print("Demultiplexing file {} failed with code ({})!".format(args.input, demultiplex_1.returncode), file=sys.stderr)
+        # if there is a failure here need to send a signal to both other processes
+        if hasattr(args, 'input_read2'):
+            demultiplex_2.send_signal(signal.SIGTERM)
+        return demultiplex_1.returncode
+    if hasattr(args, 'input_read2') and demultiplex_2.wait() != 0:
+        print("Demultiplexing file {} failed with code ({})!".format(args.input_read2, demultiplex_2.returncode), file=sys.stderr)
+        # if there is a failure here need to send a signal to both other processes
+        return demultiplex_1.returncode
+
     return 0
 
 
