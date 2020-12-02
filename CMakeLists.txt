@@ -125,7 +125,7 @@ if(__COMPILER_GNU AND NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") # GCC, MI
         endif()
 
         if(NOT ${BUILD_SHARED_LIBS})
-          set(CMAKE_EXE_LINKER_FLAGS "-static")
+          set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++")
         endif()
         # needed for std::to_string
         if(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")

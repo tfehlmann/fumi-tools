@@ -20,6 +20,12 @@ class zofstream {
     return *strm_;
   }
 
+  void flush() {
+    if (strm_ != nullptr) {
+      strm_->flush();
+    }
+  }
+
   const std::string& get_filename() const;
 
  private:
@@ -36,18 +42,20 @@ class sample_index_map {
 
   uint64_t find_indices(nonstd::string_view i5,
                         nonstd::string_view i7,
-                        unsigned int lane = 1) const;
-  uint64_t get_i7_length(unsigned int lane = 1) const {
+                        unsigned int lane) const;
+  uint64_t get_i7_length(unsigned int lane) const {
     return i7_length_[lane - 1];
   }
 
-  uint64_t get_i5_length(unsigned int lane = 1) const {
+  uint64_t get_i5_length(unsigned int lane) const {
     return i5_length_[lane - 1];
   }
 
   zstr::ofstream& get_output_file(unsigned int lane, unsigned int pos) const {
     return *output_files_[lane - 1][pos];
   }
+
+  void close_output_files(unsigned int num_threads) const;
 
  private:
   void add_i5_i7_index(std::string index5,

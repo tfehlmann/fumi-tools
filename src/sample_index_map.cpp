@@ -1,8 +1,9 @@
 #include <fumi_tools/sample_index_map.hpp>
-#include <numeric>
 
 #include <fstream>
 #include <iostream>
+#include <numeric>
+#include <thread>
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
@@ -18,6 +19,43 @@ uint64_t get_num_mismatches(nonstd::string_view lhs, nonstd::string_view rhs) {
     num_mismatches += lhs[i] != rhs[i];
   }
   return num_mismatches;
+}
+
+template <class Iterator, class Function>
+void parallel_for_each_chunk(Iterator b,
+                             Iterator e,
+                             Function fun,
+                             unsigned int threads) {
+  auto iterations = std::distance(b, e);   // number of iterations to do
+  auto per_thread = iterations / threads;  // iterations per thread
+  auto extra = iterations % threads;       // additional iterations
+  std::vector<std::thread> workers;
+  workers.reserve(threads);
+
+  // initialize counter
+  auto current_start = b;
+  auto current_finish = b;
+
+  // start the threads
+  for (unsigned int i_ = 0; i_ != threads; ++i_) {
+    if (extra != 0) {
+      ++current_finish;
+      --extra;
+    }
+    std::advance(current_finish, per_thread);
+    if (current_start == current_finish) {
+      break;
+    }
+    workers.emplace_back(
+        [&fun](Iterator start, Iterator finish) { fun(start, finish); },
+        current_start, current_finish);
+    current_start = current_finish;
+  }
+
+  // wait until every thread has finished
+  for (auto& worker : workers) {
+    worker.join();
+  }
 }
 }  // namespace
 
@@ -37,10 +75,19 @@ sample_index_map::sample_index_map(const std::string& sample_sheet,
   }
 
   // skip until [Data] line, after this we have the sample sheet table
+  // if we don't fine [Data] assume complete table has been given
+  bool found_data = false;
   for (std::string line; std::getline(ifs, line);) {
     if (line.compare(0, 6, "[Data]") == 0) {
+      found_data = true;
       break;
     }
+  }
+
+  if (!found_data) {
+    // reset read position to beginning of file (and clear eof flag)
+    ifs.clear();
+    ifs.seekg(0);
   }
 
   auto tbl_text = std::string(std::istreambuf_iterator<char>(ifs),
@@ -50,7 +97,8 @@ sample_index_map::sample_index_map(const std::string& sample_sheet,
   rapidcsv::Document doc(sstream);
   auto lane_i = doc.GetColumnIdx("Lane");
   if (lane_i == -1 && lanes.empty()) {
-    std::cerr << "The lane(s) must be specified either on the command-line or in the sample sheet!"
+    std::cerr << "The lane(s) must be specified either on the command-line or "
+                 "in the sample sheet!"
               << std::endl;
     std::exit(1);
   }
@@ -254,6 +302,8 @@ sample_index_map::sample_index_map(const std::string& sample_sheet,
 uint64_t sample_index_map::find_indices(nonstd::string_view i7,
                                         nonstd::string_view i5,
                                         unsigned int lane) const {
+  // IDEA for potential speedup
+  // Save all mismatch variations and then do a hashmap lookup
   if (lane > i7_indices_.size() || i7_indices_[lane - 1].empty()) {
     return std::numeric_limits<uint64_t>::max();
   }
@@ -285,6 +335,19 @@ uint64_t sample_index_map::find_indices(nonstd::string_view i7,
     }
   }
   return output_files_[lane - 1].size() - 1;
+}
+
+void sample_index_map::close_output_files(unsigned int num_threads) const {
+  for (auto& files : output_files_) {
+    parallel_for_each_chunk(
+        files.begin(), files.end(),
+        [](auto start, auto end) {
+          for (; start != end; ++start) {
+            start->flush();
+          }
+        },
+        num_threads);
+  }
 }
 
 void sample_index_map::add_i5_i7_index(std::string index5,

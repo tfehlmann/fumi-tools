@@ -255,17 +255,18 @@ void demultiplex_parallel2(const std::string& input,
                   << ")!" << std::endl;
         std::exit(1);
       }
-      auto i7 = nonstd::string_view(current.header.c_str() + i7_start,
-                                    map.get_i7_length());
-      auto i5 = nonstd::string_view(
-          current.header.c_str() + current.header.size() - map.get_i5_length(),
-          map.get_i5_length());
       auto lane = extract_lane(current.header);
+      auto i7 = nonstd::string_view(current.header.c_str() + i7_start,
+                                    map.get_i7_length(lane));
+      auto i5 = nonstd::string_view(
+          current.header.c_str() + current.header.size() - map.get_i5_length(lane),
+          map.get_i5_length(lane));
+
       if (format_umi) {
-        auto umi_length = current.header.size() - map.get_i5_length() -
-                          i7_start - map.get_i7_length() - 1;
+        auto umi_length = current.header.size() - map.get_i5_length(lane) -
+                          i7_start - map.get_i7_length(lane) - 1;
         auto umi = nonstd::string_view(
-            current.header.c_str() + i7_start + map.get_i7_length(),
+            current.header.c_str() + i7_start + map.get_i7_length(lane),
             umi_length);
         current.header += fmt::format("_{}", umi);
       }
