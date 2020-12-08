@@ -419,6 +419,7 @@ parser.add_argument("-I", "--input-read2", help="Input paired end R2 FASTQ file,
 parser.add_argument("-o", "--output", help="Output FASTQ file, optionally gzip compressed.", required=True, default=argparse.SUPPRESS)
 parser.add_argument("-O", "--output-read2", help="Output paired end R2 FASTQ file, optionally gzip compressed.", required=False, default=argparse.SUPPRESS)
 parser.add_argument("--umi-length", help="Length of the UMI to copy. It is assumed that the UMI starts at the 5' end of the read.", type=int, required=True)
+parser.add_argument("--tag-umi", help="Add UMI to the read ID by adding :FUMI|<UMI_SEQ>| instead of a simple underscore.", action='store_true')
 parser.add_argument("--threads", help="Number of threads to use.", default=1, type=int)
 
 args = parser.parse_args()
@@ -432,7 +433,10 @@ if not paired_end:
         for i, l in enumerate(f):
             if i % 4 == 0:
                 pos = l.find(' ')
-                new_header = "{}_{{}}{}".format(l[:pos], l[pos:])
+                if args.tag_umi:
+                    new_header = "{}:FUMI|{{}}|{}".format(l[:pos], l[pos:])
+                else:
+                    new_header = "{}_{{}}{}".format(l[:pos], l[pos:])
             elif i %4 == 1:
                 of.write(new_header.format(l[:umi_len]))
                 of.write(l)
@@ -447,9 +451,13 @@ else:
         for i, (l1, l2) in enumerate(zip(f, f2)):
             if i % 4 == 0:
                 pos1 = l1.find(' ')
-                new_header_1 = "{}_{{}}{}".format(l1[:pos1], l1[pos1:])
                 pos2 = l2.find(' ')
-                new_header_2 = "{}_{{}}{}".format(l2[:pos2], l2[pos2:])
+                if args.tag_umi:
+                    new_header_1 = "{}:FUMI|{{}}|{}".format(l1[:pos1], l1[pos1:])
+                    new_header_2 = "{}:FUMI|{{}}|{}".format(l2[:pos2], l2[pos2:])
+                else:
+                    new_header_1 = "{}_{{}}{}".format(l1[:pos1], l1[pos1:])
+                    new_header_2 = "{}_{{}}{}".format(l2[:pos2], l2[pos2:])
             elif i % 4 == 1:
                 of.write(new_header_1.format(l1[:umi_len]))
                 of2.write(new_header_2.format(l1[:umi_len]))

@@ -14,7 +14,7 @@ import os
 from distutils.spawn import find_executable
 from os.path import join, realpath, exists, dirname
 from os import remove, mkfifo
-from shutil import rmtree
+from shutil import copy, rmtree
 
 def ext_check(*args):
     def extension(filename):
@@ -92,6 +92,7 @@ Available commands are:
         parser.add_argument("-o", "--output", help="Output FASTQ file, optionally gzip, bz2 or xz compressed.", required=True, type=ext_check(*VALID_EXTS), default=argparse.SUPPRESS)
         parser.add_argument("-O", "--output-read2", help="Output paired end R2 FASTQ file, optionally gzip, bz2 or xz compressed.", required=False, type=ext_check(*VALID_EXTS), default=argparse.SUPPRESS)
         parser.add_argument("--umi-length", help="Length of the UMI to copy. It is assumed that the UMI starts at the 5' end of the read.", type=int, required=True)
+        parser.add_argument("--tag-umi", help="Add UMI to the read ID by adding :FUMI|<UMI_SEQ>| instead of a simple underscore.", action='store_true')
         parser.add_argument("--threads", help="Number of threads to use.", default=1, type=int)
         parser.add_argument("--version", help="Display version number.", action='version', version=VERSION)
         self.c_args = parser.parse_args(sys.argv[2:])
@@ -158,30 +159,22 @@ def demultiplex(args):
 
 
 def copy_umi(args):
+    copy_args = [fumi_copy_umi, "-i", args.input, "-o", args.output, "--umi-length", str(args.umi_length), "--threads", str(args.threads)]
+    if args.tag_umi:
+        copy_args.append("--tag-umi")
     if hasattr(args, 'input_read2'):
-        try:
-            result = subprocess.check_output([fumi_copy_umi, "-i", args.input, "-I", args.input_read2, "-o", args.output, "-O", args.output_read2, "--umi-length", str(args.umi_length), "--threads", str(args.threads)], stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError as e:
-            print("Extracting UMI failed with code ({})!".format(e.returncode), file=sys.stderr)
-            print(e.output.decode(), file=sys.stderr)
-            if exists(args.output):
-                remove(args.output)
-            if exists(args.output_read2):
-                remove(args.output_read2)
-            return e.returncode
-        return 0
-    else:
-        try:
-            result = subprocess.check_output([fumi_copy_umi, "-i", args.input, "-o", args.output, "--umi-length", str(args.umi_length), "--threads", str(args.threads)], stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError as e:
-            print("Extracting UMI failed with code ({})!".format(e.returncode), file=sys.stderr)
-            print(e.output.decode(), file=sys.stderr)
-            if exists(args.output):
-                remove(args.output)
-            if exists(args.output_read2):
-                remove(args.output_read2)
-            return e.returncode
-        return 0
+        copy_args.extend(["-I", args.input_read2, "-O", args.output_read2])
+    try:
+        result = subprocess.check_output(copy_args, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        print("Extracting UMI failed with code ({})!".format(e.returncode), file=sys.stderr)
+        print(e.output.decode(), file=sys.stderr)
+        if exists(args.output):
+            remove(args.output)
+        if hasattr(args, 'input_read2') and exists(args.output_read2):
+            remove(args.output_read2)
+        return e.returncode
+    return 0
         
 
 def dedup(args):

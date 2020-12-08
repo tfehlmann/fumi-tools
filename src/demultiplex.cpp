@@ -43,6 +43,7 @@ auto parse_options(int argc, char* argv[]) {
       ("e,max-errors", "Maximum allowed number of errors (mismatches per default).", cxxopts::value<unsigned int>()->default_value("1"))
       ("format-umi", "Add UMI to the end of the FASTQ header, as expected by fumi_tools dedup")
       ("l,lane", "Optionally specify on which lane the samples provided in the sample sheet ran. Can be specified multiple times to pass several lanes. This option takes precedence on the Lane column of the sample sheet.", cxxopts::value<std::vector<unsigned int>>())
+      ("tag-umi", "Add UMI to the read ID by adding :FUMI|<UMI_SEQ>| instead of a simple underscore.")
       ("threads", "Number of threads.", cxxopts::value<unsigned int>()->default_value("1"))
       ("version", "Display version number.")
       ("help", "Show this dialog.")
@@ -205,6 +206,7 @@ unsigned int extract_lane(nonstd::string_view header) {
 void demultiplex_parallel2(const std::string& input,
                            const sample_index_map& map,
                            bool format_umi,
+                           bool tag_umi,
                            unsigned int threads) {
   zstr::ifstream ifs(input);
 
@@ -258,9 +260,10 @@ void demultiplex_parallel2(const std::string& input,
       auto lane = extract_lane(current.header);
       auto i7 = nonstd::string_view(current.header.c_str() + i7_start,
                                     map.get_i7_length(lane));
-      auto i5 = nonstd::string_view(
-          current.header.c_str() + current.header.size() - map.get_i5_length(lane),
-          map.get_i5_length(lane));
+      auto i5 =
+          nonstd::string_view(current.header.c_str() + current.header.size() -
+                                  map.get_i5_length(lane),
+                              map.get_i5_length(lane));
 
       if (format_umi) {
         auto umi_length = current.header.size() - map.get_i5_length(lane) -
@@ -268,7 +271,11 @@ void demultiplex_parallel2(const std::string& input,
         auto umi = nonstd::string_view(
             current.header.c_str() + i7_start + map.get_i7_length(lane),
             umi_length);
-        current.header += fmt::format("_{}", umi);
+        if (tag_umi) {
+          current.header += fmt::format(":FUMI|{}|", umi);
+        } else {
+          current.header += fmt::format("_{}", umi);
+        }
       }
       auto pos = map.find_indices(i7, i5, lane);
       if (pos != std::numeric_limits<uint64_t>::max()) {
@@ -315,8 +322,8 @@ int main(int argc, char* argv[]) {
       vm_opts["output"].as<std::string>(),
       vm_opts["max-errors"].as<unsigned int>(),
       vm_opts["lane"].as<std::vector<unsigned int>>());
-  fumi_tools::demultiplex_parallel2(vm_opts["input"].as<std::string>(), map,
-                                    vm_opts["format-umi"].as<bool>(),
-                                    vm_opts["threads"].as<unsigned int>());
+  fumi_tools::demultiplex_parallel2(
+      vm_opts["input"].as<std::string>(), map, vm_opts["format-umi"].as<bool>(),
+      vm_opts["tag-umi"].as<bool>(), vm_opts["threads"].as<unsigned int>());
   return 0;
 }

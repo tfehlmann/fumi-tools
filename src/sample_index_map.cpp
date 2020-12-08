@@ -151,17 +151,17 @@ sample_index_map::sample_index_map(const std::string& sample_sheet,
   auto get_output_filename = [&doc, sample_i, sample_n, output_pattern](
                                  auto i, auto lane) {
     auto output = output_pattern.to_string();
-    auto si = output.find("%i");
-    if (si != nonstd::string_view::npos) {
-      output.replace(si, 2, doc.GetCell<std::string>(sample_i, i));
+    auto si_p = output.find("%i");
+    if (si_p != nonstd::string_view::npos) {
+      output.replace(si_p, 2, doc.GetCell<std::string>(static_cast<uint64_t>(sample_i), i));
     }
-    auto sn = output.find("%s");
-    if (sn != nonstd::string_view::npos) {
-      output.replace(sn, 2, doc.GetCell<std::string>(sample_n, i));
+    auto sn_p = output.find("%s");
+    if (sn_p != nonstd::string_view::npos) {
+      output.replace(sn_p, 2, doc.GetCell<std::string>(static_cast<uint64_t>(sample_n), i));
     }
-    auto ln = output.find("%l");
-    if (ln != nonstd::string_view::npos) {
-      output.replace(ln, 2, fmt::format("{:03d}", lane));
+    auto ln_p = output.find("%l");
+    if (ln_p != nonstd::string_view::npos) {
+      output.replace(ln_p, 2, fmt::format("{:03d}", lane));
     }
     return output;
   };
@@ -169,14 +169,14 @@ sample_index_map::sample_index_map(const std::string& sample_sheet,
   for (auto i = 0u; i < doc.GetRowCount(); ++i) {
     auto lane = 1u;
     if (lane_i != -1) {
-      lane = doc.GetCell<unsigned int>(lane_i, i);
+      lane = doc.GetCell<unsigned int>(static_cast<uint64_t>(lane_i), i);
     }
     if (!lanes.empty()) {
       // no lanes in sample sheet but user assigns indices to provided lane(s)
       if (lane_i == -1) {
         for (auto& l : lanes) {
-          add_i5_i7_index(doc.GetCell<std::string>(i5_i, i),
-                          doc.GetCell<std::string>(i7_i, i), l,
+          add_i5_i7_index(doc.GetCell<std::string>(static_cast<uint64_t>(i5_i), i),
+                          doc.GetCell<std::string>(static_cast<uint64_t>(i7_i), i), l,
                           get_output_filename(i, l));
         }
         continue;
@@ -186,8 +186,8 @@ sample_index_map::sample_index_map(const std::string& sample_sheet,
         continue;
       }
     }
-    add_i5_i7_index(doc.GetCell<std::string>(i5_i, i),
-                    doc.GetCell<std::string>(i7_i, i), lane,
+    add_i5_i7_index(doc.GetCell<std::string>(static_cast<uint64_t>(i5_i), i),
+                    doc.GetCell<std::string>(static_cast<uint64_t>(i7_i), i), lane,
                     get_output_filename(i, lane));
   }
 
@@ -196,17 +196,17 @@ sample_index_map::sample_index_map(const std::string& sample_sheet,
   for (auto i = 0ul; i < output_files_.size(); ++i) {
     if (!output_files_[i].empty()) {
       auto und_output = output_pattern.to_string();
-      auto si = und_output.find("%i");
-      if (si != nonstd::string_view::npos) {
-        und_output.replace(si, 2, "0");
+      auto si_p = und_output.find("%i");
+      if (si_p != nonstd::string_view::npos) {
+        und_output.replace(si_p, 2, "0");
       }
-      auto sn = und_output.find("%s");
-      if (sn != nonstd::string_view::npos) {
-        und_output.replace(sn, 2, "Undetermined");
+      auto sn_p = und_output.find("%s");
+      if (sn_p != nonstd::string_view::npos) {
+        und_output.replace(sn_p, 2, "Undetermined");
       }
-      auto ln = und_output.find("%l");
-      if (ln != nonstd::string_view::npos) {
-        und_output.replace(ln, 2, fmt::format("{:03d}", i + 1));
+      auto ln_p = und_output.find("%l");
+      if (ln_p != nonstd::string_view::npos) {
+        und_output.replace(ln_p, 2, fmt::format("{:03d}", i + 1));
       }
       output_files_[i].emplace_back(und_output);
     }
@@ -327,11 +327,11 @@ uint64_t sample_index_map::find_indices(nonstd::string_view i7,
   }
   if (it != i7_indices_[lane - 1].end()) {
     auto pos = std::distance(i7_indices_[lane - 1].begin(), it);
-    if (i5_indices_[lane - 1][pos] == i5) {
-      return pos;
-    } else if (get_num_mismatches(i5_indices_[lane - 1][pos], i5) <=
+    if (i5_indices_[lane - 1][static_cast<std::size_t>(pos)] == i5) {
+      return static_cast<std::size_t>(pos);
+    } else if (get_num_mismatches(i5_indices_[lane - 1][static_cast<std::size_t>(pos)], i5) <=
                max_errors_) {
-      return pos;
+      return static_cast<std::size_t>(pos);
     }
   }
   return output_files_[lane - 1].size() - 1;
