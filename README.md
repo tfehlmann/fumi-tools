@@ -7,7 +7,7 @@ This tool is intended to deduplicate UMIs from single-end and paired-end sequenc
 
 ## Installation
 
-This code was tested on Ubuntu 16.04, 17.10, 18.04 and Arch Linux with GCC 5, 6, 7 and 9.
+This code was tested on Ubuntu 16.04, 17.10, 18.04 and Arch Linux with GCC 5, 6, 7, 9 and 10.
 
 ### Pre-built binaries
 
@@ -69,32 +69,82 @@ usage: fumi_tools <command> [<args>]
 Version: <version>
 
 Available commands are:
-    copy_umi  Copy UMI from FASTQ files into their header
-    dedup     Deduplicate reads in BAM files
+    demultiplex  Demultiplex single FASTQ file
+    copy_umi     Copy UMI from FASTQ files into their header
+    dedup        Deduplicate reads in BAM files
 ```
 
-### First step - copy UMI into read header
+### First step - demultiplexing and/or copying UMI into read header
 
-First copy the UMI's into the read name (the sequences remain unchanged):
+In case your sequences need to be demultiplexed:
 
 ```bash
-usage: fumi_tools copy_umi [-h] -i INPUT -o OUTPUT --umi-length UMI_LENGTH
-                           [--threads THREADS] [--version]
+usage: fumi_tools demultiplex [-h] -i INPUT [-I INPUT_READ2] -s SAMPLE_SHEET -o OUTPUT [-e MAX_ERRORS] [-l LANE [LANE ...]] [--format-umi] [--tag-umi] [--threads THREADS] [--version]
 
 optional arguments:
   -h, --help            show this help message and exit
   -i INPUT, --input INPUT
                         Input FASTQ file, optionally gzip compressed.
+  -I INPUT_READ2, --input-read2 INPUT_READ2
+                        Input paired end R2 FASTQ file, optionally gzip compressed.
+  -s SAMPLE_SHEET, --sample-sheet SAMPLE_SHEET
+                        Sample Sheet in Illumina format. (default: None)
   -o OUTPUT, --output OUTPUT
-                        Output FASTQ file, optionally gzip compressed.
-  --umi-length UMI_LENGTH
-                        Length of the UMI to copy. It is assumed that the UMI
-                        starts at the 5p end of the read. (default: None)
+                        Output FASTQ file pattern, optionally gzip compressed. Use %i as placeholder for the sample index specified in the sample sheet, %s for the sample name, %l for the lane and optionally %r for the read direction (e.g. demultiplexed_reads/%s_S%i_L%l_R%r.fastq.gz).
+  -e MAX_ERRORS, --max-errors MAX_ERRORS
+                        Maximum allowed number of errors (mismatches per default). (default: 1)
+  -l LANE [LANE ...], --lane LANE [LANE ...]
+                        Optionally specify on which lane the samples provided in the sample sheet ran. Can be specified multiple times to pass several lanes. This option takes precedence on the Lane column of the sample sheet. (default: None)
+  --format-umi          Add UMI to the end of the FASTQ ID (before the first space in the header), as expected by fumi_tools dedup (default: False)
+  --tag-umi             Add UMI to the read ID by adding :FUMI|<UMI_SEQ>| instead of a simple underscore. (default: False)
   --threads THREADS     Number of threads to use. (default: 1)
-  --version             Display version number
+  --version             Display version number.
 ```
 
+```bash
+# e.g. for dummy_R1.fastq.gz containing multiple samples
+fumi_tools demultiplex --input dummy_R1.fastq.gz --sample-sheet sample_sheet.csv --output output_folder/%s_S%i_L%l_R1.fastq.gz
+```
 
+The program expects the read header to be formatted as follows (which corresponds to the output of bcl2fastq 2):
+
+```bash
+@<instrument>:<run number>:<flowcell ID>:<lane>:<tile>:<x-pos>:<y-pos> <read>:<is filtered>:<control number>:<I7-index><UMI>+<I5-index>
+```
+
+Below is an example of a minimal sample sheet. The index column contains the i7 index and the index2 column contains the i5 index. Optionally a lane column can be specified.
+
+```bash
+Sample_ID,Sample_Name,index,index2
+1,Sample234,CGCATGAT,TCAGGCTT
+2,Sample745,ACGGAACA,GTTCTCGT
+```
+
+All reads not matching any valid index combination will be outputted in a file with Sample_ID 0 and Sample_Name Undetermined.
+
+**ATTENTION: if you are using downstream tools that change the FASTQ header by inserting additional elements using underscores (e.g. bismark), or if you are unsure about it, use the --tag-umi option to copy the UMI into the read header. This will become the default option in the near future.**
+
+Alternatively, if your reads have already been demultiplexed and the UMI sequence is present in the read sequence, copy the UMI into the read header (the sequences remain unchanged):
+
+```bash
+usage: fumi_tools copy_umi [-h] -i INPUT [-I INPUT_READ2] -o OUTPUT [-O OUTPUT_READ2] --umi-length UMI_LENGTH [--tag-umi] [--threads THREADS] [--version]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INPUT, --input INPUT
+                        Input FASTQ file, optionally gzip, bz2 or xz compressed.
+  -I INPUT_READ2, --input-read2 INPUT_READ2
+                        Input paired end R2 FASTQ file, optionally gzip, bz2 or xz compressed.
+  -o OUTPUT, --output OUTPUT
+                        Output FASTQ file, optionally gzip, bz2 or xz compressed.
+  -O OUTPUT_READ2, --output-read2 OUTPUT_READ2
+                        Output paired end R2 FASTQ file, optionally gzip, bz2 or xz compressed.
+  --umi-length UMI_LENGTH
+                        Length of the UMI to copy. It is assumed that the UMI starts at the 5\' end of the read. (default: None)
+  --tag-umi             Add UMI to the read ID by adding :FUMI|<UMI_SEQ>| instead of a simple underscore. (default: False)
+  --threads THREADS     Number of threads to use. (default: 1)
+  --version             Display version number.
+```
 
 ```bash
 # e.g. for dummy.fastq.gz with UMI of length 12
