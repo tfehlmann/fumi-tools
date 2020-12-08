@@ -14,7 +14,7 @@ import os
 from distutils.spawn import find_executable
 from os.path import join, realpath, exists, dirname
 from os import remove, mkfifo
-from shutil import rmtree
+from shutil import copy, rmtree
 
 def ext_check(*args):
     def extension(filename):
@@ -35,8 +35,9 @@ script_path = realpath(dirname(__file__))
 fumi_dedup = join(script_path, "fumi_tools_dedup") if exists(join(script_path, "fumi_tools_dedup")) else "fumi_tools_dedup"
 fumi_fix = join(script_path, "fumi_tools_fix_flags") if exists(join(script_path, "fumi_tools_fix_flags")) else "fumi_tools_fix_flags"
 fumi_copy_umi = join(script_path, "fumi_tools_copy_umi") if exists(join(script_path, "fumi_tools_copy_umi")) else "fumi_tools_copy_umi"
+fumi_demultiplex = join(script_path, "fumi_tools_demultiplex") if exists(join(script_path, "fumi_tools_demultiplex")) else "fumi_tools_demultiplex"
 
-if find_executable(fumi_dedup) is None or find_executable(fumi_fix) is None or find_executable(fumi_copy_umi) is None:
+if find_executable(fumi_dedup) is None or find_executable(fumi_fix) is None or find_executable(fumi_copy_umi) is None or find_executable(fumi_demultiplex) is None:
     print("It seems that your installation is broken. Please reinstall the tool.")
     sys.exit(1)
 
@@ -51,8 +52,9 @@ class fumi_tools(object):
 Version: {}
 
 Available commands are:
-    copy_umi  Copy UMI from FASTQ files into their header
-    dedup     Deduplicate reads in BAM files
+    demultiplex  Demultiplex single FASTQ file
+    copy_umi     Copy UMI from FASTQ files into their header
+    dedup        Deduplicate reads in BAM files
 """.format(VERSION_NUMBER))
         parser.add_argument("command", help="Subcommand to run")
         args = parser.parse_args(sys.argv[1:2])
@@ -63,13 +65,34 @@ Available commands are:
         getattr(self, args.command)()
         self.command = args.command
 
+    def demultiplex(self):
+        FQ_EXTS = [".fastq", ".fq"]
+        COMPR = ["", ".gz"]
+        VALID_EXTS = ["{}{}".format(fq, c) for fq in FQ_EXTS for c in COMPR]
+        parser = argparse.ArgumentParser(prog="fumi_tools demultiplex", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        parser.add_argument("-i", "--input", help="Input FASTQ file, optionally gzip compressed.", required=True, type=ext_check(*VALID_EXTS), default=argparse.SUPPRESS)
+        parser.add_argument("-I", "--input-read2", help="Input paired end R2 FASTQ file, optionally gzip compressed.", required=False, type=ext_check(*VALID_EXTS), default=argparse.SUPPRESS)
+        parser.add_argument("-s", "--sample-sheet", help="Sample Sheet in Illumina format.", required=True)
+        parser.add_argument("-o", "--output", help="Output FASTQ file pattern, optionally gzip compressed. Use %i as placeholder for the sample index specified in the sample sheet, %s for the sample name, %l for the lane and optionally %r for the read direction (e.g. demultiplexed_reads/%s_S%i_L%l_R%r.fastq.gz).", required=True, type=ext_check(*VALID_EXTS), default=argparse.SUPPRESS)
+        parser.add_argument("-e", "--max-errors", help="Maximum allowed number of errors (mismatches per default).", type=int, default=1)
+        parser.add_argument("-l", "--lane", help="Optionally specify on which lane the samples provided in the sample sheet ran. Can be specified multiple times to pass several lanes. This option takes precedence on the Lane column of the sample sheet.",
+                            nargs='+', action='append', type=str)
+        parser.add_argument("--format-umi", help="Add UMI to the end of the FASTQ header, as expected by fumi_tools dedup", action="store_true")
+        parser.add_argument("--threads", help="Number of threads to use.", default=1, type=int)
+        parser.add_argument("--version", help="Display version number.", action='version', version=VERSION)
+        self.c_args = parser.parse_args(sys.argv[2:])
+
     def copy_umi(self):
+        FQ_EXTS = [".fastq", ".fq"]
+        COMPR = ["", ".gz", ".bz2", ".xz"]
+        VALID_EXTS = ["{}{}".format(fq, c) for fq in FQ_EXTS for c in COMPR]
         parser = argparse.ArgumentParser(prog="fumi_tools copy_umi", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-        parser.add_argument("-i", "--input", help="Input FASTQ file, optionally gzip, bz2 or xz compressed.", required=True, type=ext_check(".fastq", ".fq", ".fastq.gz", ".fq.gz"), default=argparse.SUPPRESS)
-        parser.add_argument("-I", "--input-read2", help="Input paired end R2 FASTQ file, optionally gzip, bz2 or xz compressed.", required=False, type=ext_check(".fastq", ".fq", ".fastq.gz", ".fq.gz"), default=argparse.SUPPRESS)
-        parser.add_argument("-o", "--output", help="Output FASTQ file, optionally gzip, bz2 or xz compressed.", required=True, type=ext_check(".fastq", ".fq", ".fastq.gz", ".fq.gz"), default=argparse.SUPPRESS)
-        parser.add_argument("-O", "--output-read2", help="Output paired end R2 FASTQ file, optionally gzip, bz2 or xz compressed.", required=False, type=ext_check(".fastq", ".fq", ".fastq.gz", ".fq.gz"), default=argparse.SUPPRESS)
+        parser.add_argument("-i", "--input", help="Input FASTQ file, optionally gzip, bz2 or xz compressed.", required=True, type=ext_check(*VALID_EXTS), default=argparse.SUPPRESS)
+        parser.add_argument("-I", "--input-read2", help="Input paired end R2 FASTQ file, optionally gzip, bz2 or xz compressed.", required=False, type=ext_check(*VALID_EXTS), default=argparse.SUPPRESS)
+        parser.add_argument("-o", "--output", help="Output FASTQ file, optionally gzip, bz2 or xz compressed.", required=True, type=ext_check(*VALID_EXTS), default=argparse.SUPPRESS)
+        parser.add_argument("-O", "--output-read2", help="Output paired end R2 FASTQ file, optionally gzip, bz2 or xz compressed.", required=False, type=ext_check(*VALID_EXTS), default=argparse.SUPPRESS)
         parser.add_argument("--umi-length", help="Length of the UMI to copy. It is assumed that the UMI starts at the 5' end of the read.", type=int, required=True)
+        parser.add_argument("--tag-umi", help="Add UMI to the read ID by adding :FUMI|<UMI_SEQ>| instead of a simple underscore.", action='store_true')
         parser.add_argument("--threads", help="Number of threads to use.", default=1, type=int)
         parser.add_argument("--version", help="Display version number.", action='version', version=VERSION)
         self.c_args = parser.parse_args(sys.argv[2:])
@@ -90,31 +113,68 @@ Available commands are:
         self.c_args = parser.parse_args(sys.argv[2:])
 
 
-def copy_umi(args):
-    if hasattr(args, 'input_read2'):
-        try:
-            result = subprocess.check_output([fumi_copy_umi, "-i", args.input, "-I", args.input_read2, "-o", args.output, "-O", args.output_read2, "--umi-length", str(args.umi_length), "--threads", str(args.threads)], stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError as e:
-            print("Extracting UMI failed with code ({})!".format(e.returncode), file=sys.stderr)
-            print(e.output, file=sys.stderr)
-            if exists(args.output):
-                remove(args.output)
-            if exists(args.output_read2):
-                remove(args.output_read2)
-            return e.returncode
-        return 0
+def demultiplex(args):
+    if not exists(dirname(args.output)):
+        os.makedirs(dirname(args.output))
+    if args.lane:
+        lane_arg = ["--lane={}".format(l) for l in args.lane]
     else:
-        try:
-            result = subprocess.check_output([fumi_copy_umi, "-i", args.input, "-o", args.output, "--umi-length", str(args.umi_length), "--threads", str(args.threads)], stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError as e:
-            print("Extracting UMI failed with code ({})!".format(e.returncode), file=sys.stderr)
-            print(e.output, file=sys.stderr)
-            if exists(args.output):
-                remove(args.output)
-            if exists(args.output_read2):
-                remove(args.output_read2)
-            return e.returncode
-        return 0
+        lane_arg = ""
+    out1 = args.output.replace("%r", "1")
+    threads1 = max(1, int(args.threads/2))
+    demultiplex_1 = subprocess.Popen([fumi_demultiplex, "--input", args.input,
+                                        "--sample-sheet", args.sample_sheet,
+                                        "--output", out1,
+                                        "--max-errors", str(args.max_errors),
+                                        "--threads", str(max(1, threads1)),
+                                        "--format-umi" if args.format_umi else "",
+                                        *lane_arg], stderr=subprocess.STDOUT)
+
+    if hasattr(args, 'input_read2'):
+        if "%r" not in args.output:
+            print("The read direction %r, was not found in --output argument, but it required if --input-read2 is provided.", file=sys.stderr)
+            return 1
+        out2 = args.output.replace("%r", "2")
+        threads2 = max(args.threads - threads1, 1)
+        demultiplex_2 = subprocess.Popen([fumi_demultiplex, "--input", args.input_read2,
+                                            "--sample-sheet", args.sample_sheet,
+                                            "--output", out2,
+                                            "--max-errors", str(args.max_errors),
+                                            "--threads", str(threads2),
+                                            "--format-umi" if args.format_umi else "",
+                                            *lane_arg], stderr=subprocess.STDOUT)
+    
+    if demultiplex_1.wait() != 0:
+        print("Demultiplexing file {} failed with code ({})!".format(args.input, demultiplex_1.returncode), file=sys.stderr)
+        # if there is a failure here need to send a signal to both other processes
+        if hasattr(args, 'input_read2'):
+            demultiplex_2.send_signal(signal.SIGTERM)
+        return demultiplex_1.returncode
+    if hasattr(args, 'input_read2') and demultiplex_2.wait() != 0:
+        print("Demultiplexing file {} failed with code ({})!".format(args.input_read2, demultiplex_2.returncode), file=sys.stderr)
+        # if there is a failure here need to send a signal to both other processes
+        return demultiplex_1.returncode
+
+    return 0
+
+
+def copy_umi(args):
+    copy_args = [fumi_copy_umi, "-i", args.input, "-o", args.output, "--umi-length", str(args.umi_length), "--threads", str(args.threads)]
+    if args.tag_umi:
+        copy_args.append("--tag-umi")
+    if hasattr(args, 'input_read2'):
+        copy_args.extend(["-I", args.input_read2, "-O", args.output_read2])
+    try:
+        result = subprocess.check_output(copy_args, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        print("Extracting UMI failed with code ({})!".format(e.returncode), file=sys.stderr)
+        print(e.output.decode(), file=sys.stderr)
+        if exists(args.output):
+            remove(args.output)
+        if hasattr(args, 'input_read2') and exists(args.output_read2):
+            remove(args.output_read2)
+        return e.returncode
+    return 0
         
 
 def dedup(args):
@@ -181,3 +241,5 @@ if __name__ == '__main__':
         sys.exit(copy_umi(args.c_args))
     elif args.command == "dedup":
         sys.exit(dedup(args.c_args))
+    elif args.command == "demultiplex":
+        sys.exit(demultiplex(args.c_args))

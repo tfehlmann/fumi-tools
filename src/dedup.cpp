@@ -1,17 +1,18 @@
+#include <algorithm>
+#include <iostream>
+#include <random>
+
 #include <fmt/format.h>
 #include <htslib/sam.h>
 #include <robin_hood/robin_hood.h>
-
-#include <algorithm>
 #include <cpg/cpg.hpp>
+#include <nonstd/optional.hpp>
+#include <nonstd/string_view.hpp>
+
 #include <fumi_tools/cast_helper.hpp>
 #include <fumi_tools/dedup.hpp>
 #include <fumi_tools/helper.hpp>
 #include <fumi_tools/umi_clusterer.hpp>
-#include <iostream>
-#include <nonstd/optional.hpp>
-#include <nonstd/string_view.hpp>
-#include <random>
 
 #define SHOW_DEBUG_OUTPUT false
 
@@ -20,16 +21,78 @@ namespace fumi_tools {
 namespace {
 std::mt19937 rand_gen;
 std::uniform_real_distribution<> udistrib(0, 1);
-}  // namespace
 
-nonstd::string_view get_umi(const char* c, uint8_t len) {
+enum class UMI_FORMAT { UNDERSCORE, FUMI_TAG, UNKNOWN };
+
+// either READID_UMISEQ
+// or READID:FUMI|UMISEQ|
+UMI_FORMAT determine_umi_format(const char* c, uint8_t len) {
   auto res = nonstd::string_view(c, len);
-  auto pos = res.rfind('_');
+  auto fmt = UMI_FORMAT::FUMI_TAG;
+  auto pos = res.find(":FUMI|");
+  nonstd::string_view umi;
+  if (pos == nonstd::string_view::npos) {
+    pos = res.rfind('_');
+    fmt = UMI_FORMAT::UNDERSCORE;
+    if (pos != nonstd::string_view::npos) {
+      umi = res.substr(pos + 1);
+      auto pos2 = umi.find(' ');
+      if (pos2 != nonstd::string_view::npos) {
+        umi = umi.substr(0, pos2);
+      }
+    }
+  } else {
+    umi = res.substr(pos + 6);
+    auto pos2 = umi.find('|');
+    if (pos2 != nonstd::string_view::npos) {
+      umi = umi.substr(0, pos2);
+    } else {
+      pos = nonstd::string_view::npos;
+    }
+  }
   if (pos == nonstd::string_view::npos) {
     throw std::runtime_error(
-        fmt::format("Did not find umi for read {}!", res.to_string()));
+        fmt::format("Did not find UMI for read {}!", res.to_string()));
   }
-  return res.substr(res.rfind('_') + 1);
+  if (umi.find_first_not_of("ACGTN") != nonstd::string_view::npos) {
+    throw std::runtime_error(fmt::format(
+        "Could not identify a valid UMI for read {}!", res.to_string()));
+  }
+  return fmt;
+}
+
+nonstd::string_view get_umi(const char* c, uint8_t len, UMI_FORMAT fmt) {
+  auto res = nonstd::string_view(c, len);
+  if (fmt == UMI_FORMAT::UNDERSCORE) {
+    auto pos = res.rfind('_');
+    if (pos == nonstd::string_view::npos) {
+      throw std::runtime_error(
+          fmt::format("Did not find umi for read {}!", res.to_string()));
+    }
+    auto umi = res.substr(pos + 1);
+    auto pos2 = umi.find(' ');
+    if (pos2 == nonstd::string_view::npos) {
+      return umi;
+    } else {
+      return umi.substr(0, pos2);
+    }
+  } else if (fmt == UMI_FORMAT::FUMI_TAG) {
+    auto pos = res.find(":FUMI|");
+    if (pos == nonstd::string_view::npos) {
+      throw std::runtime_error(
+          fmt::format("Did not find umi for read {}!", res.to_string()));
+    }
+    auto umi = res.substr(pos + 6);
+    auto pos2 = umi.find('|');
+    if (pos2 != nonstd::string_view::npos) {
+      return umi.substr(0, pos2);
+    } else {
+      throw std::runtime_error(
+          fmt::format("Did not find umi for read {}!", res.to_string()));
+    }
+  } else {
+    throw std::runtime_error("Unknown UMI format!");
+  }
 }
 
 /**
@@ -78,7 +141,7 @@ bool cigar_has_cref_skip(uint32_t* cigar, unsigned int len) {
   return false;
 }
 
-std::tuple<uint64_t, uint64_t, bool> get_read_position(
+std::tuple<int64_t, int64_t, bool> get_read_position(
     const bam1_t* read,
     uint32_t soft_clip_threshold) {
   auto is_spliced = false;
@@ -88,7 +151,7 @@ std::tuple<uint64_t, uint64_t, bool> get_read_position(
     auto pos = bam_endpos(read);
     if ((cigar[n_cigar - 1] & BAM_CIGAR_MASK) == BAM_CSOFT_CLIP) {
       auto count = cigar[n_cigar - 1] >> BAM_CIGAR_SHIFT;
-      pos += count;
+      pos += static_cast<int>(count);
     }
     auto start = read->core.pos;
     if (cigar_has_cref_skip(cigar, n_cigar) ||
@@ -100,7 +163,7 @@ std::tuple<uint64_t, uint64_t, bool> get_read_position(
   } else {
     auto pos = read->core.pos;
     if ((cigar[0] & BAM_CIGAR_MASK) == BAM_CSOFT_CLIP) {
-      pos -= cigar[0] >> BAM_CIGAR_SHIFT;
+      pos -= static_cast<int>(static_cast<int>(cigar[0] >> BAM_CIGAR_SHIFT));
     }
     auto start = pos;
     if (cigar_has_cref_skip(cigar, n_cigar) ||
@@ -121,14 +184,14 @@ struct custom_bam1_hash {
   std::size_t operator()(const bam1_t* lhs) const {
     auto hi_lhs = bam_aux_get(lhs, "HI");
     auto hi_lhs_int = hi_lhs == nullptr ? 0 : bam_aux2i(hi_lhs);
-    return robin_hood::hash_int(lhs->core.pos) ^
-           robin_hood::hash_int(lhs->core.tid) ^
+    return robin_hood::hash_int(static_cast<uint64_t>(lhs->core.pos)) ^
+           robin_hood::hash_int(static_cast<uint64_t>(lhs->core.tid)) ^
            robin_hood::hash_bytes(bam_get_qname(lhs),
                                   std::strlen(bam_get_qname(lhs))) ^
-           robin_hood::hash_int(lhs->core.mpos) ^
-           robin_hood::hash_int(lhs->core.mtid) ^
-           robin_hood::hash_int(lhs->core.isize) ^
-           robin_hood::hash_int(hi_lhs_int);
+           robin_hood::hash_int(static_cast<uint64_t>(lhs->core.mpos)) ^
+           robin_hood::hash_int(static_cast<uint64_t>(lhs->core.mtid)) ^
+           robin_hood::hash_int(static_cast<uint64_t>(lhs->core.isize)) ^
+           robin_hood::hash_int(static_cast<uint64_t>(hi_lhs_int));
   }
 };
 
@@ -178,24 +241,24 @@ bam1_t build_mate_bam1_dummy(const bam1_t& read) {
   return dummy;
 }
 
-bool read_is_potentially_after_mate(const bam1_t& read){
+bool read_is_potentially_after_mate(const bam1_t& read) {
   return (read.core.mtid < read.core.tid ||
-   (read.core.mtid == read.core.tid && read.core.pos >= read.core.mpos));
+          (read.core.mtid == read.core.tid && read.core.pos >= read.core.mpos));
 }
 
-bool read_is_after_mate(const bam1_t& read){
+bool read_is_after_mate(const bam1_t& read) {
   return (read.core.mtid < read.core.tid ||
-   (read.core.mtid == read.core.tid && read.core.pos > read.core.mpos));
+          (read.core.mtid == read.core.tid && read.core.pos > read.core.mpos));
 }
 
 template <class ReadGroup, bool is_paired>
 void update_read_map(
     bam1_t* read,
-    uint64_t pos,
+    int64_t pos,
     ReadGroup key,
     std::string umi,
     robin_hood::unordered_flat_map<
-        uint64_t,
+        int64_t,
         robin_hood::unordered_flat_map<
             ReadGroup,
             robin_hood::unordered_flat_map<
@@ -203,7 +266,7 @@ void update_read_map(
                 std::pair<std::unique_ptr<bam1_t, bam1_t_deleter>, uint64_t>>>>&
         read_map,
     robin_hood::unordered_flat_map<
-        uint64_t,
+        int64_t,
         robin_hood::unordered_flat_map<
             ReadGroup,
             robin_hood::unordered_flat_map<std::string, uint64_t>>>&
@@ -320,6 +383,7 @@ std::ostream& operator<<(std::ostream& out,
   out << '}';
   return out;
 }
+}  // namespace
 
 template <class ReadGroup, bool is_paired, class Fun>
 void process_bam_read_chunks_helper(samFile* file,
@@ -329,11 +393,11 @@ void process_bam_read_chunks_helper(samFile* file,
                                     Fun fun) {
   auto cur_ref = 0;
   auto last_ref = -1;
-  auto last_pos = 0ul;
-  auto last_output_pos = 0ul;
+  int64_t last_pos = 0l;
+  int64_t last_output_pos = 0l;
 
   robin_hood::unordered_flat_map<
-      uint64_t,
+      int64_t,
       robin_hood::unordered_flat_map<
           ReadGroup,
           robin_hood::unordered_flat_map<
@@ -341,7 +405,7 @@ void process_bam_read_chunks_helper(samFile* file,
               std::pair<std::unique_ptr<bam1_t, bam1_t_deleter>, uint64_t>>>>
       read_map;
   robin_hood::unordered_flat_map<
-      uint64_t,
+      int64_t,
       robin_hood::unordered_flat_map<
           ReadGroup, robin_hood::unordered_flat_map<std::string, uint64_t>>>
       read_counts;
@@ -358,9 +422,9 @@ void process_bam_read_chunks_helper(samFile* file,
 
   auto output_positions = [&read_map, &read_counts, &fun, &current_reads,
                            &paired_read_map, &not_yet_paired_reads](
-                              nonstd::optional<uint64_t> start,
+                              nonstd::optional<int64_t> start,
                               int32_t bam_pos) {
-    std::vector<uint64_t> positions;
+    std::vector<int64_t> positions;
     positions.reserve(read_map.size());
     for (auto& k_v : read_map) {
       if (!start.has_value() || k_v.first + 1000 < start) {
@@ -399,17 +463,20 @@ void process_bam_read_chunks_helper(samFile* file,
 
   auto progress = cpg::cpg(prog_cfg);
 
+  UMI_FORMAT umi_fmt = UMI_FORMAT::UNKNOWN;
   bam1_t* record = bam_init1();
   while (sam_read1(file, bam_hdr, record) > 0) {
     if ((record->core.flag & BAM_FUNMAP) == 0) {
       if (is_paired && (record->core.flag & BAM_FMUNMAP) != 0 &&
           opts.unpaired_reads == "discard") {
+        progress.update();
         continue;
       }
       if (is_paired && (record->core.flag & BAM_FREAD2) != 0) {
         if (record->core.tid <= cur_ref) {
           // we already saw r1
-          if (record->core.mpos < record->core.pos || record->core.tid < cur_ref) {
+          if (record->core.mpos < record->core.pos ||
+              record->core.tid < cur_ref) {
             bam1_t dummy = build_mate_bam1_dummy(*record);
             // keep paired read only if we kept r1
             if (current_reads.find(&dummy) != current_reads.end()) {
@@ -432,6 +499,7 @@ void process_bam_read_chunks_helper(samFile* file,
               }
               // this is not a pointer to the free store, so release ownership
               dummy_ptr.release();
+              progress.update();
               continue;
             }
           } else {  // >= 0, need to check later
@@ -440,13 +508,17 @@ void process_bam_read_chunks_helper(samFile* file,
         } else {
           paired_read_map.emplace(bam_dup1(record));
         }
+        progress.update();
         continue;
       }
       cur_ref = record->core.tid;
       auto* qname = bam_get_qname(record);
-      auto umi = get_umi(qname, std::strlen(qname));
-      uint64_t start = 0;
-      uint64_t pos = 0;
+      if (umi_fmt == UMI_FORMAT::UNKNOWN) {
+        umi_fmt = determine_umi_format(qname, std::strlen(qname));
+      }
+      auto umi = get_umi(qname, std::strlen(qname), umi_fmt);
+      int64_t start = 0;
+      int64_t pos = 0;
       bool is_spliced = false;
       std::tie(start, pos, is_spliced) =
           get_read_position(record, opts.soft_clip_threshold);
@@ -460,6 +532,7 @@ void process_bam_read_chunks_helper(samFile* file,
           std::unique_ptr<bam1_t, bam1_t_deleter> dummy_ptr(&dummy);
           paired_read_map.erase(dummy_ptr);
           dummy_ptr.release();
+          progress.update();
           continue;
         }
       }
@@ -579,9 +652,9 @@ void dedup(const std::string& input, const std::string& output, umi_opts opts) {
         fmt::format("BAM file needs to be coordinate sorted!"));
   }
 
-  samFile* out = hts_open(
-      output.c_str(),
-      opts.uncompressed ? "wbu" : ends_with(output, ".bam") ? "wb" : "w");
+  samFile* out = hts_open(output.c_str(), opts.uncompressed           ? "wbu"
+                                          : ends_with(output, ".bam") ? "wb"
+                                                                      : "w");
   if (out == nullptr) {
     throw std::runtime_error(fmt::format("Could not open file '{}'", output));
   }
@@ -608,8 +681,8 @@ void dedup(const std::string& input, const std::string& output, umi_opts opts) {
           if (paired) {
             process_paired_reads(
                 read, paired_read_map, not_yet_paired_reads, bam_pos,
-                [&out, &bam_hdr](const bam1_t* read) {
-                  if (sam_write1(out, bam_hdr, read) < 0) {
+                [&out, &bam_hdr](const bam1_t* r) {
+                  if (sam_write1(out, bam_hdr, r) < 0) {
                     std::cerr << "Failed to write to output file!" << std::endl;
                     std::exit(1);
                   }

@@ -1,5 +1,5 @@
 set(name "ZLib_cf")
-set(url "https://github.com/cloudflare/zlib/archive/372bcd151c901418c2721232bf09dc9cdbebafb5.zip")
+set(url "https://github.com/cloudflare/zlib/archive/ab50ae879a9e9b2d5874b7da17ec6e8b3eba2b85.zip")
 set(fname "ZLib_cf.zip")
 set(dl "${CMAKE_CURRENT_BINARY_DIR}/${name}-dl")
 set(src "${CMAKE_CURRENT_BINARY_DIR}/${name}-src")

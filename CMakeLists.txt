@@ -11,6 +11,8 @@ if(NOT DEFINED CMAKE_BUILD_TYPE)
         set(CMAKE_BUILD_TYPE Release)
 endif()
 
+set(CMAKE_CXX_STANDARD 14)
+
 #configure static linking
 option(BUILD_SHARED_LIBS "Build a shared (ON) or static (OFF) executable" ON)
 option(BUILD_GENERIC "Build so that the code runs on other x86-64 CPUs as well" ON)
@@ -43,10 +45,10 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 # NOT NEEDED RIGHT NOW BECAUSE LIBS ARE STATIC
 # the RPATH to be used when installing, but only if it's not a system directory
-#list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
-#if("${isSystemDir}" STREQUAL "-1")
-#   set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
-#endif("${isSystemDir}" STREQUAL "-1")
+list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
+if("${isSystemDir}" STREQUAL "-1" AND ${BUILD_SHARED_LIBS})
+   set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
+endif()
 
 
 # add own modules to the search path
@@ -72,6 +74,8 @@ include(ExternalProject)
 include("${PROJECT_SOURCE_DIR}/CMake/ExternalZLib.cmake")
 include("${PROJECT_SOURCE_DIR}/CMake/External_cppformat.cmake")
 include("${PROJECT_SOURCE_DIR}/CMake/External_htslib.cmake")
+include("${PROJECT_SOURCE_DIR}/CMake/External_jemalloc.cmake")
+
 
 # add the include header tree to the search path for include files
 include_directories("${PROJECT_SOURCE_DIR}/include")
@@ -91,6 +95,8 @@ include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/lib/optional-lite/include")
 add_subdirectory(include)
 add_subdirectory(src)
 
+add_subdirectory(lib/filesystem)
+
 # collect the sources
 get_property(SOURCE_FILES GLOBAL PROPERTY SRCS_LIST)
 get_property(HEADER_FILES GLOBAL PROPERTY HDRS_LIST)
@@ -102,6 +108,11 @@ set(ZLIB_LIBRARIES ${ZLib_cf_LIBRARY})
 set(ZLIB_INCLUDE_DIRS ${ZLib_cf_INCLUDE_DIR})
 set(ZLIB_FOUND True)
 
+#include("CMake/TBB/TBBGet.cmake")
+#include("CMake/TBB/TBBBuild.cmake")
+#tbb_get(TBB_ROOT tbb_root SOURCE_CODE)
+#tbb_build(TBB_ROOT ${tbb_root} CONFIG_DIR TBB_DIR)
+#find_package(TBB REQUIRED tbb)
 
 if(__COMPILER_GNU AND NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") # GCC, MINGW
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -pthread")
@@ -114,7 +125,7 @@ if(__COMPILER_GNU AND NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") # GCC, MI
         endif()
 
         if(NOT ${BUILD_SHARED_LIBS})
-          set(CMAKE_EXE_LINKER_FLAGS "-static")
+          set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++")
         endif()
         # needed for std::to_string
         if(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
@@ -154,19 +165,24 @@ add_library(${PROJECT_NAME} STATIC ${SOURCE_FILES} ${HEADER_FILES})
 
 add_executable(${PROJECT_NAME}-bin ${POST_CONFIGURE_FILE} ${MAIN_FILE})
 add_executable(${PROJECT_NAME}-fix-flags-bin ${POST_CONFIGURE_FILE} src/fix_flags.cpp)
+add_executable(${PROJECT_NAME}-demultiplex-bin ${POST_CONFIGURE_FILE} src/demultiplex.cpp src/sample_index_map.cpp)
+
 
 if (EXISTS "${PROJECT_SOURCE_DIR}/.git")
     add_dependencies(${PROJECT_NAME}-bin check_git_repository)
     add_dependencies(${PROJECT_NAME}-fix-flags-bin check_git_repository)
+    add_dependencies(${PROJECT_NAME}-demultiplex-bin check_git_repository)
 endif()
 
 set_target_properties(${PROJECT_NAME}-bin
   PROPERTIES OUTPUT_NAME ${PROJECT_NAME}_dedup)
-#target_git_version_init(${PROJECT_NAME}-bin)
 
 set_target_properties(${PROJECT_NAME}-fix-flags-bin
   PROPERTIES OUTPUT_NAME ${PROJECT_NAME}_fix_flags)
-#target_git_version_init(${PROJECT_NAME}-fix-flags-bin)
+
+set_target_properties(${PROJECT_NAME}-demultiplex-bin
+  PROPERTIES OUTPUT_NAME ${PROJECT_NAME}_demultiplex)
+
 
 add_dependencies(${PROJECT_NAME} ${cppformat_LIBRARY} ${ZLib_cf_LIBRARY} ${htslib_LIBRARY})
 
@@ -179,13 +195,15 @@ if(NOT WIN32)
     target_link_libraries(${PROJECT_NAME} ${COMMON_LIBS} rt pthread)
     target_link_libraries(${PROJECT_NAME}-bin ${PROJECT_NAME})
     target_link_libraries(${PROJECT_NAME}-fix-flags-bin ${PROJECT_NAME})
+    target_link_libraries(${PROJECT_NAME}-demultiplex-bin ${PROJECT_NAME} ${JEMALLOC_LIBRARIES} ghc_filesystem)
 else()
     target_link_libraries(${PROJECT_NAME} ${COMMON_LIBS})
     target_link_libraries(${PROJECT_NAME}-bin ${PROJECT_NAME} ws2_32)
-    target_link_libraries(${PROJECT_NAME}-fix-flags-bin ${PROJECT_NAME} ws2_32)
+    target_link_libraries(${PROJECT_NAME}-demultiplex-bin ${PROJECT_NAME} ws2_32 ${JEMALLOC_LIBRARIES} ghc_filesystem)
 endif()
 
 install(TARGETS ${PROJECT_NAME}-bin DESTINATION bin)
 install(TARGETS ${PROJECT_NAME}-fix-flags-bin DESTINATION bin)
-#install(FILES ${HEADER_FILES} DESTINATION include/fumi_tools/)
+install(TARGETS ${PROJECT_NAME}-demultiplex-bin DESTINATION bin)
+
 install(PROGRAMS ${PROJECT_SOURCE_DIR}/bin/fumi_tools ${PROJECT_SOURCE_DIR}/bin/fumi_tools_copy_umi DESTINATION bin)
