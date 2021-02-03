@@ -1,18 +1,22 @@
+#include <chrono>
 #include <condition_variable>
-#include <cpg/cpg.hpp>
-#include <cxxopts/cxxopts.hpp>
-#include <fumi_tools/cast_helper.hpp>
-#include <fumi_tools/version.hpp>
 #include <iostream>
 #include <memory>
 #include <mutex>
 #include <nonstd/string_view.hpp>
 #include <queue>
+#include <deque>
 #include <string>
 #include <thread>
 #include <vector>
 
 //#include <tbb/tbb.h>
+
+#include <cpg/cpg.hpp>
+#include <cxxopts/cxxopts.hpp>
+
+#include <fumi_tools/cast_helper.hpp>
+#include <fumi_tools/version.hpp>
 
 #include <zstr/zstr.hpp>
 
@@ -21,6 +25,7 @@
 
 #include <fumi_tools/sample_index_map.hpp>
 
+using namespace std::chrono_literals;
 namespace {
 
 void required_options(cxxopts::Options& opts,
@@ -92,104 +97,6 @@ struct fq_entry {
   std::string qual;
 };
 
-std::ostream& operator<<(std::ostream& os, const fq_entry& e) {
-  return os << e.header << '\n'
-            << e.seq << '\n'
-            << e.desc << '\n'
-            << e.qual << '\n';
-}
-
-// void demultiplex_serial(const std::string& input, const sample_index_map&
-// map) {
-//  zstr::ifstream ifs(input);
-
-//  const auto& output_files = map.get_output_files();
-//  uint64_t i = 0;
-//  fq_entry current{};
-//  for (std::string line; std::getline(ifs, line); ++i) {
-//    if (i % 4 == 0) {
-//      current.header = line;
-//    } else if (i % 4 == 1) {
-//      current.seq = line;
-//    } else if (i % 4 == 2) {
-//      current.desc = line;
-//    } else if (i % 4 == 3) {
-//      current.qual = line;
-//      auto i7_start = current.header.rfind(":");
-//      if (i7_start != std::string::npos) {
-//        i7_start++;
-//      }
-//      auto i7 = nonstd::string_view(current.header.c_str() + i7_start,
-//                                    map.get_i7_length());
-//      auto i5 = nonstd::string_view(
-//          current.header.c_str() + current.header.size() -
-//          map.get_i5_length(), map.get_i5_length());
-//      auto pos = map.find_indices(i7, i5);
-//      if (pos != std::numeric_limits<uint64_t>::max()) {
-//        (*output_files[pos]) << current;
-//      }
-//    }
-//  }
-//}
-
-// void demultiplex_parallel(const std::string& input,
-//                          const sample_index_map& map) {
-//  zstr::ifstream ifs(input);
-
-//  const auto& output_files = map.get_output_files();
-//  std::vector<tbb::spin_mutex> mutexes(output_files.size());
-
-//  std::vector<fq_entry> fq_entries;
-//  const uint64_t fq_entries_chunk_size = 1024;
-//  fq_entries.reserve(fq_entries_chunk_size);
-//  tbb::parallel_pipeline(
-//      128,
-//      tbb::make_filter<void, std::vector<fq_entry>>(
-//          tbb::filter::serial,
-//          [&fq_entries, &ifs](tbb::flow_control& fc) {
-//            std::vector<fq_entry> fq_entries;
-//            uint64_t i = 0;
-//            fq_entry current{};
-//            for (std::string line; std::getline(ifs, line); ++i) {
-//              if (i % 4 == 0) {
-//                current.header = line;
-//              } else if (i % 4 == 1) {
-//                current.seq = line;
-//              } else if (i % 4 == 2) {
-//                current.desc = line;
-//              } else if (i % 4 == 3) {
-//                current.qual = line;
-//                fq_entries.push_back(std::move(current));
-//                if (fq_entries.size() == fq_entries_chunk_size) {
-//                  return fq_entries;
-//                }
-//              }
-//            }
-//            fc.stop();
-//            return fq_entries;
-//          }) &
-//          tbb::make_filter<std::vector<fq_entry>, void>(
-//              tbb::filter::parallel,
-//              [&map, &output_files, &mutexes](std::vector<fq_entry> entries) {
-//                std::vector<std::vector<fq_entry>> out_entries(
-//                    output_files.size());
-//                for (auto& e : entries) {
-//                  auto i7_start = e.header.rfind(":");
-//                  if (i7_start != std::string::npos) {
-//                    i7_start++;
-//                  }
-//                  auto i7 = nonstd::string_view(e.header.c_str() + i7_start,
-//                                                map.get_i7_length());
-//                  auto i5 = nonstd::string_view(
-//                      e.header.c_str() + e.header.size() -
-//                      map.get_i5_length(), map.get_i5_length());
-//                  auto pos = map.find_indices(i7, i5);
-//                  if (pos != std::numeric_limits<uint64_t>::max()) {
-//                    // out_entries[] e;
-//                  }
-//                }
-//              }));
-//}
 
 unsigned int extract_lane(nonstd::string_view header) {
   auto pos = header.find(":");
@@ -210,7 +117,7 @@ void demultiplex_parallel2(const std::string& input,
                            unsigned int threads) {
   zstr::ifstream ifs(input);
 
-  std::vector<std::queue<std::vector<std::tuple<uint32_t, uint32_t, fq_entry>>>>
+  std::vector<std::deque<std::vector<std::tuple<uint32_t, uint32_t, std::string>>>>
       t_queues(threads);
   std::vector<std::mutex> t_mutexes(threads);
   std::vector<std::condition_variable> t_cvs(threads);
@@ -220,26 +127,35 @@ void demultiplex_parallel2(const std::string& input,
   out_threads.reserve(threads);
   for (auto i = 0ul; i < threads; ++i) {
     out_threads.emplace_back(
-        [i, &map, &t_mutexes, &t_cvs, &t_queues, &is_done]() {
-          while (true) {
-            std::unique_lock<std::mutex> _(t_mutexes[i]);
-            t_cvs[i].wait(_, [i, &t_queues] { return !t_queues[i].empty(); });
-            auto fq_entries = std::move(t_queues[i].front());
-            t_queues[i].pop();
-            _.unlock();
-            for (auto& fq_entry : fq_entries) {
-              map.get_output_file(std::get<0>(fq_entry), std::get<1>(fq_entry))
-                  << std::get<2>(fq_entry);
-            }
-            if (is_done && t_queues[i].empty()) {
-              break;
-            }
-          }
-        });
+                [i, &map, &t_mutexes, &t_cvs, &t_queues, &is_done]() {
+                  while (true) {
+                    std::unique_lock<std::mutex> _(t_mutexes[i]);
+                    t_cvs[i].wait(_, [i, &t_queues, &is_done] {
+                        return !t_queues[i].empty() || is_done;
+                    });
+                    if (is_done && t_queues[i].empty()) {
+                      break;
+                    }
+                    auto fq_entries = std::move(t_queues[i].front());
+                    t_queues[i].pop_front();
+                    _.unlock();
+                    for (auto& fq_entry : fq_entries) {
+                      map.get_output_file(std::get<0>(fq_entry),
+                      std::get<1>(fq_entry))
+                          << std::get<2>(fq_entry);
+                    }
+                    if (is_done && t_queues[i].empty()) {
+                      break;
+                    }
+                  }
+                }
+    );
   }
 
+  uint64_t mem_limit_per_thread = 1000 * 1024 * 1024;  // 1 GB
   uint64_t i = 0;
   fq_entry current{};
+  std::string entry;
   for (std::string line; std::getline(ifs, line); ++i) {
     if (i % 4 == 0) {
       current.header = line;
@@ -279,14 +195,22 @@ void demultiplex_parallel2(const std::string& input,
       }
       auto pos = map.find_indices(i7, i5, lane);
       if (pos != std::numeric_limits<uint64_t>::max()) {
-        std::lock_guard<std::mutex> _(t_mutexes[pos % threads]);
+        std::unique_lock<std::mutex> _(t_mutexes[pos % threads]);
         if (t_queues[pos % threads].empty()) {
-          t_queues[pos % threads].push({});
+          t_queues[pos % threads].push_back({});
         }
+        auto q_entry = fmt::format("{}\n{}\n{}\n{}\n",
+                                 current.header, current.seq, current.desc, current.qual);
+        auto q_size = q_entry.size() + sizeof(q_entry);
         t_queues[pos % threads].front().push_back(
-            std::make_tuple(lane, pos, current));
+            std::make_tuple(lane, pos, std::move(q_entry)));
         if (t_queues[pos % threads].front().size() > 4096) {
           t_cvs[pos % threads].notify_one();
+          while(!t_queues[pos % threads].empty() && t_queues[pos % threads].front().size()  * q_size * 2 > mem_limit_per_thread) {
+              _.unlock();
+              std::this_thread::sleep_for(300ms);
+              _.lock();
+          }
         }
       }
     }
