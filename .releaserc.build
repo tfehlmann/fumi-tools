@@ -1,0 +1,10 @@
+{
+"branch": "master",
+"plugins": [
+  '@semantic-release/commit-analyzer', 
+  ['@semantic-release/exec', {
+    "publishCmd": "./build.sh . ${nextRelease.version}"
+  }],
+],
+"tagFormat": "${version}"
+}
