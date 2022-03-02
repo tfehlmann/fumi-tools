@@ -1,4 +1,5 @@
 stages:
+  - build
   - release
 
 services:
@@ -8,20 +9,74 @@ variables:
   GIT_SUBMODULE_STRATEGY: recursive
 
 
-publish:
+build_linux:
   image: node:12
-  stage: release
+  stage: build
   script:
     - apt-get update && apt-get install -y cmake
     - npm install -g semantic-release@15
     - npm install -g @semantic-release/git
     - npm install -g @semantic-release/gitlab
     - npm install -g @semantic-release/exec
+    - export PLATFORM=linux_x86_64
+    - export CMAKE=cmake
+    - export CMAKE_ARGS="-DUSE_LIBCPP=OFF"
+    - cp .releaserc.build .releaserc
+    - semantic-release
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 10 min
+  tags:
+    - docker
+  only:
+    - master
+
+
+build_mac:
+  image: fzwoch/docker-macos@sha256:25f702f32207205ec9b0b22b6a20c09ec0ed19896744fe89d6414a31a54e2552
+  stage: build
+  script:
+    - patch /opt/osxcross/target/toolchain.cmake < cross_compile/toolchain.patch
+    - apt-get update && apt-get install -y curl software-properties-common
+    - curl -sL https://deb.nodesource.com/setup_13.x | bash -
+    - apt install -y nodejs   
+    - npm install -g semantic-release@15
+    - npm install -g @semantic-release/git
+    - npm install -g @semantic-release/gitlab
+    - npm install -g @semantic-release/exec
+    - export PLATFORM=apple_darwin_x86_64
+    - export CMAKE=x86_64-apple-darwin18-cmake
+    - export CMAKE_ARGS="-DUSE_LIBCPP=ON"
+    - cp .releaserc.build .releaserc
+    - semantic-release
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 10 min
+  tags:
+    - docker
+  only:
+    - master
+
+
+publish:
+  image: node:12
+  stage: release
+  script:
+    - ls dist
+    - apt-get update && apt-get install -y cmake
+    - npm install -g semantic-release@15
+    - npm install -g @semantic-release/git
+    - npm install -g @semantic-release/gitlab
+    - npm install -g @semantic-release/exec
+    - cp .releaserc.deploy .releaserc
     - semantic-release
   tags:
     - docker
   only:
     - master
+
 
 conda:
   image: continuumio/miniconda

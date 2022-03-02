@@ -5,9 +5,8 @@ set -e
 SOURCE_DIR=$(realpath "$1")
 VERSION="$2"
 
-# build static binaries
-mkdir -p /tmp/build && cd /tmp/build && cmake "${SOURCE_DIR}" -DCMAKE_INSTALL_PREFIX="${SOURCE_DIR}"/dist -DBUILD_SHARED_LIBS=OFF && make -j4 install
-cd "${SOURCE_DIR}"/dist && tar czfv "fumi_tools_${VERSION}_static_linux_x86_64.tar.gz" bin
+# generate version.hpp
+mkdir /tmp/build && cd /tmp/build && cmake "${SOURCE_DIR}" -DBUILD_SHARED_LIBS=OFF -DBUILD_GENERIC=ON
 
 # build source tgz that includes version.hpp generated previously
 mkdir /tmp/$$
