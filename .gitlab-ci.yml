@@ -39,7 +39,7 @@ build_mac:
   script:
     - patch /opt/osxcross/target/toolchain.cmake < cross_compile/toolchain.patch
     - apt-get update && apt-get install -y curl software-properties-common
-    - curl -sL https://deb.nodesource.com/setup_13.x | bash -
+    - curl -sL https://deb.nodesource.com/setup_16.x | bash -
     - apt install -y nodejs   
     - npm install -g semantic-release@15
     - npm install -g @semantic-release/git
