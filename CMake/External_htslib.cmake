@@ -14,8 +14,10 @@ set(Zlib_cf_INCLUDE ${ZLib_cf_install}/include)
 set(HTSLIB_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_RELEASE}")
 set(HTSLIB_CPP_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}")
 
-if($ENV{CMAKE} STREQUAL "x86_64-apple-darwin18-cmake")
-  set(CONFIG_CROSS_COMPILE_APPLE "--host x86_64-apple-darwin18")
+if(DEFINED ENV{CMAKE})
+  if($ENV{CMAKE} STREQUAL "x86_64-apple-darwin18-cmake")
+    set(CONFIG_CROSS_COMPILE_APPLE "--host x86_64-apple-darwin18")
+  endif()
 endif()
 
 ExternalProject_Add(
