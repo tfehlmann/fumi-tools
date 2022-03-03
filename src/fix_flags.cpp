@@ -171,7 +171,7 @@ std::array<int64_t, 3> get_second_best_as(
   auto has_as = bam_aux_get(reads[0].get(), "AS") != nullptr;
   auto second_best_as_r1 = [&]() {
     if (stats.num_r1_reads == 0 || !has_as) {
-      return -1l;
+      return static_cast<decltype(bam_aux2i(0))>(-1l);
     }
     auto idx = stats.num_r1_reads == 1 ? 0ul : 1ul;
     auto r = reads[idx].get();
@@ -180,7 +180,7 @@ std::array<int64_t, 3> get_second_best_as(
   }();
   auto second_best_as_r2 = [&]() {
     if (stats.num_r2_reads == 0 || !has_as) {
-      return -1l;
+      return static_cast<decltype(bam_aux2i(0))>(-1l);
     }
     auto idx =
         stats.num_r2_reads == 1 ? stats.num_r1_reads : stats.num_r1_reads + 1;
@@ -190,7 +190,7 @@ std::array<int64_t, 3> get_second_best_as(
   }();
   auto second_best_as_other = [&]() {
     if (stats.num_other_reads == 0 || !has_as) {
-      return -1l;
+      return static_cast<decltype(bam_aux2i(0))>(-1l);
     }
     auto idx = stats.num_other_reads == 1
                    ? stats.num_r1_reads + stats.num_r2_reads

@@ -12,6 +12,11 @@ set(ZLib_cf_LIBRARY_DIR ${ZLib_cf_install}/lib)
 set(Zlib_cf_INCLUDE ${ZLib_cf_install}/include)
 
 set(HTSLIB_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_RELEASE}")
+set(HTSLIB_CPP_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}")
+
+if($ENV{CMAKE} STREQUAL "x86_64-apple-darwin18-cmake")
+  set(CONFIG_CROSS_COMPILE_APPLE "--host x86_64-apple-darwin18")
+endif()
 
 ExternalProject_Add(
   ${name}_project
@@ -20,7 +25,9 @@ ExternalProject_Add(
   SOURCE_DIR ${src}
   INSTALL_DIR ${install}
   BUILD_IN_SOURCE 1
-  CONFIGURE_COMMAND cd ${src} && bash -c "CFLAGS='-fPIC -I${Zlib_cf_INCLUDE} ${HTSLIB_C_FLAGS}' LDFLAGS='-fPIC -L${ZLib_cf_LIBRARY_DIR}' ./configure --prefix=${install} --without-curses --without-libdeflate --disable-bz2 --disable-lzma --enable-libcurl=no"
+  #PATCH_COMMAND patch -t -N ${src}/configure.ac ${PROJECT_SOURCE_DIR}/CMake/htslib-macosx.patch
+  #CONFIGURE_COMMAND cd ${src} && bash -c "CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} AR=${CMAKE_AR} RANLIB=${CMAKE_RANLIB} rm -v ./configure && autoreconf" && bash -c " AR=${CMAKE_AR} RANLIB=${CMAKE_RANLIB} CC=${CMAKE_C_COMPILER} ./configure --host x86_64-apple-darwin18 --prefix=${install} --without-curses --without-libdeflate --disable-bz2 --disable-lzma --enable-libcurl=no"
+  CONFIGURE_COMMAND cd ${src} && bash -c "CFLAGS='-fPIC -I${Zlib_cf_INCLUDE} ${HTSLIB_C_FLAGS}' LDFLAGS='-fPIC -L${ZLib_cf_LIBRARY_DIR}' ./configure ${CONFIG_CROSS_COMPILE_APPLE} CC=${CMAKE_C_COMPILER} --prefix=${install} --without-curses --without-libdeflate --disable-bz2 --disable-lzma --enable-libcurl=no"
 #  BUILD_COMMAND cd ${src} && sed -i "s#^CFLAGS.*$#CFLAGS = -fPIC -I${Zlib_cf_INCLUDE} ${HTSLIB_C_FLAGS}#" Makefile && sed -i "s#^LDFLAGS.*$#LDFLAGS = -fPIC -L${ZLib_cf_LIBRARY_DIR}#" Makefile && make
 )
 

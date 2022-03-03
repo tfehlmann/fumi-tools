@@ -13,7 +13,7 @@ build_linux:
   image: node:12
   stage: build
   script:
-    - apt-get update && apt-get install -y cmake
+    - apt-get update && apt-get install -y cmake autoconf
     - npm install -g semantic-release@15
     - npm install -g @semantic-release/git
     - npm install -g @semantic-release/gitlab
@@ -38,7 +38,7 @@ build_mac:
   stage: build
   script:
     - patch /opt/osxcross/target/toolchain.cmake < cross_compile/toolchain.patch
-    - apt-get update && apt-get install -y curl software-properties-common
+    - apt-get update && apt-get install -y curl software-properties-common autoconf
     - curl -sL https://deb.nodesource.com/setup_16.x | bash -
     - apt install -y nodejs   
     - npm install -g semantic-release@15
@@ -49,6 +49,10 @@ build_mac:
     - export CMAKE=x86_64-apple-darwin18-cmake
     - export CMAKE_ARGS="-DUSE_LIBCPP=ON"
     - cp .releaserc.build .releaserc
+    # override ranlib and ar because htslib is not taking them up when cross-compiling
+    - cp /opt/osxcross/target/bin/x86_64-apple-darwin18-ranlib /usr/bin/
+    - cp /opt/osxcross/target/bin/x86_64-apple-darwin18-ranlib /usr/bin/ranlib
+    - cp /opt/osxcross/target/bin/x86_64-apple-darwin18-ar /usr/bin/ar
     - semantic-release
   artifacts:
     paths:
