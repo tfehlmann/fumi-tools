@@ -68,7 +68,7 @@ publish:
   image: node:12
   stage: release
   script:
-    - ls dist
+    - ls dist || true
     - apt-get update && apt-get install -y cmake
     - npm install -g semantic-release@15
     - npm install -g @semantic-release/git
