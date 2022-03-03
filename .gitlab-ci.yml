@@ -88,7 +88,7 @@ conda:
   script:
     - apt-get update && apt-get install -y build-essential
     - conda install conda-build anaconda-client conda-verify
-    - anaconda login --hostname CI --username $ANACONDA_USER --password $ANACONDA_PASSWORD
+    - yes | anaconda login --hostname CI --username $ANACONDA_USER --password $ANACONDA_PASSWORD
     - conda config --set anaconda_upload yes
     - conda build --override-channels -c conda-forge -c bioconda -c defaults conda-recipe
   after_script:
