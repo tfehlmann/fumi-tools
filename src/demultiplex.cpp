@@ -1,5 +1,6 @@
 #include <chrono>
 #include <condition_variable>
+#include <cstdint>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -156,6 +157,15 @@ void demultiplex_parallel2(const std::string& input,
   uint64_t i = 0;
   fq_entry current{};
   std::string entry;
+  cpg::cpg_cfg pcfg;
+  pcfg.desc = "Demultiplexing";
+  pcfg.unit = "reads";
+  pcfg.unit_scale = true;
+  pcfg.dynamic_ncols = true;
+  auto progress = cpg::cpg(pcfg);
+  constexpr uint64_t progress_interval = 10000000;
+  uint64_t read_count = 0;
+  std::vector<uint64_t> skipped_lanes;
   for (std::string line; std::getline(ifs, line); ++i) {
     if (i % 4 == 0) {
       current.header = line;
@@ -174,6 +184,22 @@ void demultiplex_parallel2(const std::string& input,
         std::exit(1);
       }
       auto lane = extract_lane(current.header);
+      if (!map.has_lane(lane)) {
+        if (lane >= skipped_lanes.size()) {
+          skipped_lanes.resize(lane + 1, 0);
+        }
+        if (skipped_lanes[lane] == 0) {
+          fmt::print(stderr,
+              "Warning: encountered reads from lane {} which is not in the "
+              "sample sheet. These reads will be skipped.\n", lane);
+        }
+        ++skipped_lanes[lane];
+        ++read_count;
+        if (read_count % progress_interval == 0) {
+          progress.update(progress_interval);
+        }
+        continue;
+      }
       auto i7 = nonstd::string_view(current.header.c_str() + i7_start,
                                     map.get_i7_length(lane));
       auto i5 =
@@ -213,6 +239,17 @@ void demultiplex_parallel2(const std::string& input,
           }
         }
       }
+      ++read_count;
+      if (read_count % progress_interval == 0) {
+        progress.update(progress_interval);
+      }
+    }
+  }
+  progress.update(read_count % progress_interval);
+  for (unsigned int lane = 0; lane < skipped_lanes.size(); ++lane) {
+    if (skipped_lanes[lane] > 0) {
+      fmt::print(stderr, "\nWarning: skipped {} reads from lane {} "
+          "(not in the sample sheet)\n", skipped_lanes[lane], lane);
     }
   }
   is_done = true;

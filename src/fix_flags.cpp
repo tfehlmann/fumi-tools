@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #include <fmt/format.h>
 
 #include <cpg/cpg.hpp>

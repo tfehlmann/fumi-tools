@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <iostream>
 
 #include <nonstd/string_view.hpp>

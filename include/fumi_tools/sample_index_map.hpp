@@ -1,6 +1,7 @@
 #ifndef FUMI_TOOLS_SAMPLE_INDEX_MAP_HPP
 #define FUMI_TOOLS_SAMPLE_INDEX_MAP_HPP
 
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -43,6 +44,12 @@ class sample_index_map {
   uint64_t find_indices(nonstd::string_view i5,
                         nonstd::string_view i7,
                         unsigned int lane) const;
+
+  bool has_lane(unsigned int lane) const {
+    return lane >= 1 && lane <= i7_indices_.size() &&
+           !i7_indices_[lane - 1].empty();
+  }
+
   uint64_t get_i7_length(unsigned int lane) const {
     return i7_length_[lane - 1];
   }
