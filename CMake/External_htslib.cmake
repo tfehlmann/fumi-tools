@@ -5,11 +5,15 @@ set(src "${CMAKE_CURRENT_BINARY_DIR}/${name}-src")
 set(build "${CMAKE_CURRENT_BINARY_DIR}/${name}")
 set(install "${CMAKE_CURRENT_BINARY_DIR}/${name}_install")
 
-#get_filename_component(ZLib_cf_LIBRARY_DIR ZLib_cf_LIBRARY DIRECTORY)
-
-set(ZLib_cf_install "${CMAKE_CURRENT_BINARY_DIR}/ZLib_cf_install")
-set(ZLib_cf_LIBRARY_DIR ${ZLib_cf_install}/lib)
-set(Zlib_cf_INCLUDE ${ZLib_cf_install}/include)
+if(USE_SYSTEM_ZLIB)
+  find_package(ZLIB REQUIRED)
+  get_filename_component(ZLib_cf_LIBRARY_DIR "${ZLIB_LIBRARIES}" DIRECTORY)
+  set(Zlib_cf_INCLUDE "${ZLIB_INCLUDE_DIRS}")
+else()
+  set(ZLib_cf_install "${CMAKE_CURRENT_BINARY_DIR}/ZLib_cf_install")
+  set(ZLib_cf_LIBRARY_DIR ${ZLib_cf_install}/lib)
+  set(Zlib_cf_INCLUDE ${ZLib_cf_install}/include)
+endif()
 
 set(HTSLIB_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_RELEASE}")
 set(HTSLIB_CPP_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}")
@@ -27,6 +31,7 @@ ExternalProject_Add(
   SOURCE_DIR ${src}
   INSTALL_DIR ${install}
   BUILD_IN_SOURCE 1
+  BUILD_BYPRODUCTS ${src}/htslib-1.9/libhts.a
   #PATCH_COMMAND patch -t -N ${src}/configure.ac ${PROJECT_SOURCE_DIR}/CMake/htslib-macosx.patch
   #CONFIGURE_COMMAND cd ${src} && bash -c "CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} AR=${CMAKE_AR} RANLIB=${CMAKE_RANLIB} rm -v ./configure && autoreconf" && bash -c " AR=${CMAKE_AR} RANLIB=${CMAKE_RANLIB} CC=${CMAKE_C_COMPILER} ./configure --host x86_64-apple-darwin18 --prefix=${install} --without-curses --without-libdeflate --disable-bz2 --disable-lzma --enable-libcurl=no"
   CONFIGURE_COMMAND cd ${src} && bash -c "CFLAGS='-fPIC -I${Zlib_cf_INCLUDE} ${HTSLIB_C_FLAGS}' LDFLAGS='-fPIC -L${ZLib_cf_LIBRARY_DIR}' ./configure ${CONFIG_CROSS_COMPILE_APPLE} CC=${CMAKE_C_COMPILER} --prefix=${install} --without-curses --without-libdeflate --disable-bz2 --disable-lzma --enable-libcurl=no"
@@ -48,7 +53,9 @@ add_library(${${name}_LIBRARY} UNKNOWN IMPORTED)
 set_property(TARGET ${${name}_LIBRARY} PROPERTY IMPORTED_LOCATION
                 ${${name}_LIBRARY_PATH})
 
-# zlib must be downloaded and compiled before
-add_dependencies(${name}_project ${ZLib_cf_LIBRARY})
+# zlib must be downloaded and compiled before (unless using system zlib)
+if(NOT USE_SYSTEM_ZLIB)
+  add_dependencies(${name}_project ${ZLib_cf_LIBRARY})
+endif()
 add_dependencies(${${name}_LIBRARY} ${name}_project)
 

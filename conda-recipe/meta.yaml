@@ -3,7 +3,7 @@ package:
   version: {{ GIT_DESCRIBE_TAG }}
 
 source:
-  git_url: https://ccb-gitlab.cs.uni-saarland.de/tobias/fumi_tools.git
+  git_url: https://github.com/tfehlmann/fumi-tools.git
   git_rev: {{ GIT_DESCRIBE_TAG }}
 
 build:
@@ -14,6 +14,8 @@ build:
 requirements:
   build:
     - cmake
+    - make
+    - autoconf
     - {{ compiler('c') }}
     - {{ compiler('cxx') }}
   host:
@@ -23,7 +25,7 @@ requirements:
     - pigz
 
 about:
-  home: https://ccb-gitlab.cs.uni-saarland.de/tobias/fumi_tools
+  home: https://github.com/tfehlmann/fumi-tools
   license: MIT
   license_file: LICENSE
   summary: |

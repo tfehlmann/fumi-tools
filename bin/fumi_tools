@@ -11,10 +11,13 @@ import uuid
 import math
 import os
 
-from distutils.spawn import find_executable
 from os.path import join, realpath, exists, dirname
-from os import remove, mkfifo
-from shutil import copy, rmtree
+from os import remove
+
+try:
+    from shutil import which as find_executable
+except ImportError:
+    from distutils.spawn import find_executable
 
 def ext_check(*args):
     def extension(filename):
@@ -76,7 +79,7 @@ Available commands are:
         parser.add_argument("-o", "--output", help="Output FASTQ file pattern, optionally gzip compressed. Use %%i as placeholder for the sample index specified in the sample sheet, %%s for the sample name, %%l for the lane and optionally %%r for the read direction (e.g. demultiplexed_reads/%%s_S%%i_L%%l_R%%r.fastq.gz).", required=True, type=ext_check(*VALID_EXTS), default=argparse.SUPPRESS)
         parser.add_argument("-e", "--max-errors", help="Maximum allowed number of errors (mismatches per default).", type=int, default=1)
         parser.add_argument("-l", "--lane", help="Optionally specify on which lane the samples provided in the sample sheet ran. Can be specified multiple times to pass several lanes. This option takes precedence on the Lane column of the sample sheet.",
-                            nargs='+', action='append', type=str)
+                            nargs='+', type=str)
         parser.add_argument("--format-umi", help="Add UMI to the end of the FASTQ ID (before the first space in the header), as expected by fumi_tools dedup", action="store_true")
         parser.add_argument("--tag-umi", help="Add UMI to the read ID by adding :FUMI|<UMI_SEQ>| instead of a simple underscore.", action='store_true')        
         parser.add_argument("--threads", help="Number of threads to use.", default=1, type=int)

@@ -9,7 +9,7 @@
 	url = https://github.com/martinus/robin-hood-hashing.git
 [submodule "lib/cpg"]
 	path = lib/cpg
-	url = ../cpg.git
+	url = https://github.com/tfehlmann/cpg.git
 [submodule "lib/optional-lite"]
 	path = lib/optional-lite
 	url = https://github.com/martinmoene/optional-lite.git

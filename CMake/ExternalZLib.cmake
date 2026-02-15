@@ -35,12 +35,14 @@ ExternalProject_Add(
   INSTALL_DIR ${install}
   BUILD_COMMAND ""
   PATCH_COMMAND ""
+  BUILD_BYPRODUCTS ${install}/lib/libz.a
   CMAKE_ARGS
   "-G${CMAKE_GENERATOR}"
   "-DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>"
   "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
   "-DCMAKE_C_FLAGS=${ZLIB_C_FLAGS}"
   "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
+  "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
   "-DBUILD_SHARED_LIBS=OFF"
   "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
   INSTALL_COMMAND
@@ -48,7 +50,6 @@ ExternalProject_Add(
     --build .
     --target install
     --config ${CMAKE_BUILD_TYPE}
-    -- "${parallel_build}"
 )
 
 

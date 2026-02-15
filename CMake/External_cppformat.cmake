@@ -1,5 +1,5 @@
 set(name "cppformat")
-set(url "https://github.com/fmtlib/fmt/releases/download/6.0.0/fmt-6.0.0.zip")
+set(url "https://github.com/fmtlib/fmt/releases/download/8.1.1/fmt-8.1.1.zip")
 set(dl "${CMAKE_CURRENT_BINARY_DIR}/${name}-dl")
 set(src "${CMAKE_CURRENT_BINARY_DIR}/${name}-src")
 set(build "${CMAKE_CURRENT_BINARY_DIR}/${name}")
@@ -25,24 +25,23 @@ ExternalProject_Add(
   BINARY_DIR ${build}
   INSTALL_DIR ${install}
   BUILD_COMMAND ""
+  BUILD_BYPRODUCTS ${install}/lib64/libfmt.a ${install}/lib64/libfmtd.a
   CMAKE_ARGS
   "-G${CMAKE_GENERATOR}"
   "-DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>"
   "-DCMAKE_INSTALL_LIBDIR:PATH=<INSTALL_DIR>/lib64"
   "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
-  '-DCMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS} ${CXX_FLAGS}"'
+  "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
   "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
   "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
   "-DFMT_DOC=OFF"
   "-DFMT_TEST=OFF"
   "${POSITION_INDEPENDENT_CODE}"
-  "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
   INSTALL_COMMAND
     "${CMAKE_COMMAND}"
     --build .
     --target install
     --config ${CMAKE_BUILD_TYPE}
-    -- "${parallel_build}"
 )
 
 

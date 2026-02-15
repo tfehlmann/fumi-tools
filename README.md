@@ -1,4 +1,4 @@
-[![pipeline status](https://ccb-gitlab.cs.uni-saarland.de/tobias/fumi_tools/badges/master/pipeline.svg)](https://ccb-gitlab.cs.uni-saarland.de/tobias/fumi_tools/commits/master) [![Anaconda-Server Badge](https://anaconda.org/ccb-sb/fumi_tools/badges/platforms.svg)](https://anaconda.org/ccb-sb/fumi_tools) [![Anaconda-Server Badge](https://anaconda.org/ccb-sb/fumi_tools/badges/version.svg)](https://anaconda.org/ccb-sb/fumi_tools) [![Commitizen friendly](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](http://commitizen.github.io/cz-cli/)
+[![Build and Release](https://github.com/tfehlmann/fumi-tools/actions/workflows/release.yml/badge.svg)](https://github.com/tfehlmann/fumi-tools/actions/workflows/release.yml) [![Anaconda-Server Badge](https://anaconda.org/tfehlmann/fumi_tools/badges/version.svg)](https://anaconda.org/tfehlmann/fumi_tools) [![Anaconda-Server Badge](https://anaconda.org/tfehlmann/fumi_tools/badges/platforms.svg)](https://anaconda.org/tfehlmann/fumi_tools)
 
 
 # fumi-tools
@@ -11,19 +11,19 @@ This code was tested on Ubuntu 16.04, 17.10, 18.04 and Arch Linux with GCC 5, 6,
 
 ### Pre-built binaries
 
-Download the latest binaries from the [release page](https://ccb-gitlab.cs.uni-saarland.de/tobias/fumi_tools/releases). These are self-contained and should work on any 64-bit Linux system.
+Download the latest binaries from the [release page](https://github.com/tfehlmann/fumi-tools/releases). These are self-contained and should work on any 64-bit Linux or macOS ARM64 system.
 
-### Conda [![Anaconda-Server Badge](https://anaconda.org/ccb-sb/fumi_tools/badges/installer/conda.svg)](https://anaconda.org/ccb-sb/fumi_tools)
+### Conda [![Anaconda-Server Badge](https://anaconda.org/tfehlmann/fumi_tools/badges/version.svg)](https://anaconda.org/tfehlmann/fumi_tools)
 
-Binaries are also available on our conda channel and can be installed with the following command:
+Binaries are also available on conda and can be installed with the following command:
 
 ```bash
-conda install -c ccb-sb fumi_tools
+conda install -c tfehlmann fumi_tools
 ```
 
 ### Build the code
 
-Download the source code either from the [release page](https://ccb-gitlab.cs.uni-saarland.de/tobias/fumi_tools/releases) (Source code /w dependencies) or clone the repository with [git](https://git-scm.com/). Then build the code with [CMake](https://cmake.org/) (if installation_path is omitted, will default to /usr/local). The only dependencies for building the code are a GCC compiler (might work with Clang) and CMake.
+Download the source code either from the [release page](https://github.com/tfehlmann/fumi-tools/releases) (Source code /w dependencies) or clone the repository with [git](https://git-scm.com/). Then build the code with [CMake](https://cmake.org/) (if installation_path is omitted, will default to /usr/local). The only dependencies for building the code are a GCC compiler (might work with Clang) and CMake.
 
 ```bash
 cd {path_to_source_code}

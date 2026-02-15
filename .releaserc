@@ -1,0 +1,19 @@
+{
+  "branches": ["main"],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    ["@semantic-release/exec", {
+      "prepareCmd": "scripts/make-source-tarball.sh ${nextRelease.version}",
+      "publishCmd": "echo ${nextRelease.version} > .release-version"
+    }],
+    ["@semantic-release/github", {
+      "assets": [
+        {"path": "dist/fumi_tools_static_linux_x86_64.tar.gz", "label": "Linux x86_64 binary"},
+        {"path": "dist/fumi_tools_static_apple_darwin_arm64.tar.gz", "label": "macOS ARM64 binary"},
+        {"path": "dist/fumi_tools-*.tar.gz", "label": "Source code (with dependencies)"}
+      ]
+    }]
+  ],
+  "tagFormat": "${version}"
+}

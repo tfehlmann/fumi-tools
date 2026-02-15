@@ -1,0 +1,130 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    container: debian:11
+    name: Build linux_x86_64
+
+    steps:
+      - name: Install dependencies
+        run: apt-get update && apt-get install -y git cmake autoconf g++ make zlib1g-dev
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Build and package
+        run: scripts/build.sh linux_x86_64 -DUSE_LIBCPP=OFF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fumi_tools_static_linux_x86_64
+          path: dist/fumi_tools_static_linux_x86_64.tar.gz
+
+  build-macos:
+    runs-on: macos-latest
+    name: Build apple_darwin_arm64
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: brew install cmake ninja autoconf automake zlib
+
+      - name: Build and package
+        run: scripts/build.sh apple_darwin_arm64 -DUSE_LIBCPP=ON -DBUILD_GENERIC=OFF -DUSE_SYSTEM_ZLIB=ON
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fumi_tools_static_apple_darwin_arm64
+          path: dist/fumi_tools_static_apple_darwin_arm64.tar.gz
+
+  release:
+    needs: [build-linux, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Install semantic-release
+        run: npm install semantic-release @semantic-release/github @semantic-release/exec
+
+      - name: Release
+        id: release
+        run: npx semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if release was published
+        id: check
+        run: |
+          if [ -f .release-version ]; then
+            echo "released=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "released=false" >> "$GITHUB_OUTPUT"
+          fi
+
+    outputs:
+      released: ${{ steps.check.outputs.released }}
+
+  conda:
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    strategy:
+      matrix:
+        include:
+          - platform: linux-64
+            runner: ubuntu-latest
+          - platform: osx-arm64
+            runner: macos-latest
+
+    runs-on: ${{ matrix.runner }}
+    name: Conda ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+
+      - name: Install conda-build and anaconda-client
+        shell: bash -el {0}
+        run: conda install -y conda-build anaconda-client
+
+      - name: Build conda package
+        shell: bash -el {0}
+        run: conda build conda-recipe --output-folder conda-out
+
+      - name: Upload to Anaconda.org
+        shell: bash -el {0}
+        run: anaconda -t "${{ secrets.ANACONDA_TOKEN }}" upload --user tfehlmann --force conda-out/${{ matrix.platform }}/fumi_tools-*
+        env:
+          ANACONDA_TOKEN: ${{ secrets.ANACONDA_TOKEN }}

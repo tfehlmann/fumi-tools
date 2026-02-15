@@ -1,14 +1,14 @@
 # HOW TO USE
 # pass the needed compiler if necessary with -DCMAKE_C_COMPILER=/opt/gcc-4.9/bin/gcc -DCMAKE_CXX_COMPILER=/opt/gcc-4.9/bin/g++
 # The minimum required version of cmake
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.5)
 
 # The name of the project
 project(fumi_tools)
 
-# Use Debug as default build
-if(NOT DEFINED CMAKE_BUILD_TYPE)
-        set(CMAKE_BUILD_TYPE Release)
+# Default to Release build
+if(NOT CMAKE_BUILD_TYPE)
+        set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
 set(CMAKE_CXX_STANDARD 14)
@@ -19,6 +19,7 @@ option(BUILD_GENERIC "Build so that the code runs on other x86-64 CPUs as well" 
 option(USE_LIBCPP "Use libc++ instead of libstdc++" OFF)
 option(USE_CXXABI "Use cxxabi for clang" OFF)
 option(USE_JEMALLOC "Use jemalloc for memory allocation" ON)
+option(USE_SYSTEM_ZLIB "Use system zlib instead of bundled cloudflare zlib" OFF)
 
 if(NOT ${BUILD_SHARED_LIBS})
   #disable -rdynamic
@@ -72,7 +73,18 @@ endif()
 #include("${PROJECT_SOURCE_DIR}/CMake/gitversion/cmake.cmake")
 
 include(ExternalProject)
-include("${PROJECT_SOURCE_DIR}/CMake/ExternalZLib.cmake")
+if(USE_SYSTEM_ZLIB)
+  find_package(ZLIB REQUIRED)
+  set(ZLib_cf_LIBRARY ${ZLIB_LIBRARIES})
+  set(ZLib_cf_INCLUDE_DIR ${ZLIB_INCLUDE_DIRS})
+  # Create an imported target so ExternalProject dependencies work
+  if(NOT TARGET ZLib_cf)
+    add_library(ZLib_cf UNKNOWN IMPORTED)
+    set_property(TARGET ZLib_cf PROPERTY IMPORTED_LOCATION "${ZLIB_LIBRARIES}")
+  endif()
+else()
+  include("${PROJECT_SOURCE_DIR}/CMake/ExternalZLib.cmake")
+endif()
 include("${PROJECT_SOURCE_DIR}/CMake/External_cppformat.cmake")
 include("${PROJECT_SOURCE_DIR}/CMake/External_htslib.cmake")
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux" AND ${USE_JEMALLOC})
@@ -108,10 +120,11 @@ get_property(HEADER_FILES GLOBAL PROPERTY HDRS_LIST)
 get_property(MAIN_FILE GLOBAL PROPERTY MAIN_FILE)
 get_property(TEST_FILES GLOBAL PROPERTY TESTS_LIST)
 
-#find_package(ZLIB REQUIRED)
-set(ZLIB_LIBRARIES ${ZLib_cf_LIBRARY})
-set(ZLIB_INCLUDE_DIRS ${ZLib_cf_INCLUDE_DIR})
-set(ZLIB_FOUND True)
+if(NOT USE_SYSTEM_ZLIB)
+  set(ZLIB_LIBRARIES ${ZLib_cf_LIBRARY})
+  set(ZLIB_INCLUDE_DIRS ${ZLib_cf_INCLUDE_DIR})
+  set(ZLIB_FOUND True)
+endif()
 
 #include("CMake/TBB/TBBGet.cmake")
 #include("CMake/TBB/TBBBuild.cmake")
@@ -189,9 +202,17 @@ set_target_properties(${PROJECT_NAME}-demultiplex-bin
   PROPERTIES OUTPUT_NAME ${PROJECT_NAME}_demultiplex)
 
 
-add_dependencies(${PROJECT_NAME} ${cppformat_LIBRARY} ${ZLib_cf_LIBRARY} ${htslib_LIBRARY})
+if(USE_SYSTEM_ZLIB)
+  add_dependencies(${PROJECT_NAME} ${cppformat_LIBRARY} ${htslib_LIBRARY})
+else()
+  add_dependencies(${PROJECT_NAME} ${cppformat_LIBRARY} ${ZLib_cf_LIBRARY} ${htslib_LIBRARY})
+endif()
 
-set(COMMON_LIBS ${cppformat_LIBRARY} ${htslib_LIBRARY} ${BZIP2_LIBRARIES} ${LIBLZMA_LIBRARIES} ${CURL_LIBRARIES} ${ZLib_cf_LIBRARY})
+if(USE_SYSTEM_ZLIB)
+  set(COMMON_LIBS ${cppformat_LIBRARY} ${htslib_LIBRARY} ${BZIP2_LIBRARIES} ${LIBLZMA_LIBRARIES} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES})
+else()
+  set(COMMON_LIBS ${cppformat_LIBRARY} ${htslib_LIBRARY} ${BZIP2_LIBRARIES} ${LIBLZMA_LIBRARIES} ${CURL_LIBRARIES} ${ZLib_cf_LIBRARY})
+endif()
 # link with libraries
 if(NOT WIN32)
     if(${CMAKE_SYSTEM_NAME} MATCHES "Linux" AND ${USE_CXXABI})
